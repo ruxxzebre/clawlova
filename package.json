@@ -1,0 +1,10 @@
+{
+    "name": "clawlova",
+    "version": "0.0.1",
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "dev": "npm run dev --workspace=@clawlova/cockpit"
+    }
+}
