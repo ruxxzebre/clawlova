@@ -161,6 +161,23 @@ export class OpenClawTextAdapter implements TextAdapter<
     const timestamp = Date.now()
     const runId = genId('run')
     const messageId = genId('msg')
+    const gatewayToken =
+      typeof process !== 'undefined'
+        ? process.env['OPENCLAW_TOKEN']?.trim()
+        : undefined
+
+    if (!gatewayToken) {
+      yield {
+        type: 'RUN_ERROR',
+        runId,
+        timestamp: Date.now(),
+        error: {
+          message:
+            'Legacy OpenClaw HTTP adapter is not configured. Use the WebSocket session bridge or set OPENCLAW_TOKEN explicitly.',
+        },
+      }
+      return
+    }
 
     let response: Response
     try {
@@ -168,9 +185,7 @@ export class OpenClawTextAdapter implements TextAdapter<
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          // TODO: device auth — uncomment and set OPENCLAW_TOKEN when configured:
-          // Authorization: `Bearer ${process.env['OPENCLAW_TOKEN']}`,
-          Authorization: 'Bearer 84a282e900a37b9eeaaf3fc71416074da9e8de43021008cd',
+          Authorization: `Bearer ${gatewayToken}`,
         },
         body: JSON.stringify({
           model: 'openclaw',

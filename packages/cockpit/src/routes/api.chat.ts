@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { chat, toServerSentEventsResponse } from '@tanstack/ai'
-import { openClawText } from '#/lib/openclaw-adapter'
+import { toServerSentEventsResponse } from '@tanstack/ai'
+import { createOpenClawSessionStream } from '#/lib/openclaw-session-bridge'
 
 export const Route = createFileRoute('/api/chat')({
   server: {
@@ -17,10 +17,9 @@ export const Route = createFileRoute('/api/chat')({
           once: true,
         })
 
-        const stream = chat({
-          adapter: openClawText(),
+        const stream = createOpenClawSessionStream({
           messages,
-          abortController,
+          abortSignal: abortController.signal,
         })
 
         return toServerSentEventsResponse(stream, { abortController })

@@ -2,14 +2,16 @@ FROM node:22-alpine AS base
 
 WORKDIR /app
 
-# Install dependencies
+# Install workspace dependencies from the repo root so npm can resolve
+# the cockpit package as part of the workspace.
 COPY package.json package-lock.json ./
-RUN npm ci --prefer-offline
+COPY packages/cockpit/package.json packages/cockpit/package.json
+RUN npm ci
 
 # Build
 FROM base AS builder
 COPY . .
-RUN npm run build
+RUN npm run build --workspace=cockpit
 
 # Production image
 FROM node:22-alpine AS runner
@@ -19,9 +21,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Copy built output
-COPY --from=builder /app/.output /app/.output
-COPY --from=builder /app/package.json /app/package.json
+# Copy Nitro output for the cockpit workspace.
+COPY --from=builder /app/packages/cockpit/.output /app/.output
 
 EXPOSE 3000
 
