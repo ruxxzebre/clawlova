@@ -1,0 +1,22 @@
+{
+  "projectName": "cockpit",
+  "mode": "file-router",
+  "typescript": true,
+  "packageManager": "npm",
+  "includeExamples": true,
+  "tailwind": true,
+  "addOnOptions": {},
+  "envVarValues": {},
+  "git": false,
+  "routerOnly": false,
+  "version": 1,
+  "framework": "react",
+  "chosenAddOns": [
+    "eslint",
+    "ai",
+    "compiler",
+    "tanstack-query",
+    "events",
+    "store"
+  ]
+}
