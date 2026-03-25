@@ -1,0 +1,13 @@
+node_modules
+.DS_Store
+.output
+.env
+openclaw-config
+openclaw-workspace
+.temp
+*.log
+*.pdf
+.openclaw-device*.json
+.openclaw-device-token
+.gateway-token
+skills-lock.json

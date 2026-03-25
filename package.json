@@ -5,6 +5,7 @@
         "packages/*"
     ],
     "scripts": {
-        "dev": "npm run dev --workspace=@clawlova/cockpit"
+        "dev": "npm run dev --workspace=@clawlova/cockpit",
+        "openclaw:ws": "node scripts/openclaw-ws-chat.mjs"
     }
 }

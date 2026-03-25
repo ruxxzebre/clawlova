@@ -5,7 +5,9 @@ services:
     environment:
       HOME: /home/node
       TERM: xterm-256color
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENCLAW_CONFIG_ROOT: /home/node/.openclaw
       OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
       OPENCLAW_BOOTSTRAP_TOKEN_FILE: /home/node/.openclaw/.gateway-token
@@ -51,7 +53,9 @@ services:
     environment:
       HOME: /home/node
       TERM: xterm-256color
-      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
@@ -107,7 +111,7 @@ services:
     ports:
       - "${COCKPIT_PORT:-3000}:3000"
     volumes:
-      - openclaw-config:/openclaw-config:ro
+      - openclaw-config:/openclaw-config
       - cockpit-state:/var/lib/cockpit
     environment:
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789

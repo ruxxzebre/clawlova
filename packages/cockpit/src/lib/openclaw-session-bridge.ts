@@ -513,6 +513,7 @@ export function extractLatestUserMessageText(
       return legacyContent.trim()
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     const text = (message.parts ?? [])
       .filter((part): part is { type: 'text'; content: string } => {
         return part.type === 'text' && typeof part.content === 'string'
