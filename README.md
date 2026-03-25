@@ -27,6 +27,8 @@ open http://localhost:3000
 
 The first startup takes ~60 seconds while OpenClaw initializes its config, the gateway starts, and the cockpit device is automatically paired.
 
+<img src="docs/screenshots/chat.png" alt="Chat Interface" width="600">
+
 ## Architecture
 
 ```
@@ -117,6 +119,8 @@ Streaming tool call events rendered as expandable UI cards:
 - Output results shown on completion
 - Status icons and color coding
 
+<img src="docs/screenshots/tool-calls.png" alt="Tool Call Visualization" width="600">
+
 ### Config Generator
 
 A web UI at `/config` to view and update the OpenClaw configuration file (`openclaw.json`) programmatically — no manual JSON editing required.
@@ -126,6 +130,8 @@ A web UI at `/config` to view and update the OpenClaw configuration file (`openc
 - **Tools** — Toggle web search, select search provider (DuckDuckGo, Google, Bing), choose tool profile (coding, general, minimal).
 - **Gateway** — Port, bind mode (loopback/LAN), auth token, allowed CORS origins. UI warns when changes require a container restart.
 - **Plugins** — Enable/disable plugins, add new ones by name.
+
+<img src="docs/screenshots/config.png" alt="Configuration Dashboard" width="600">
 
 The server-side API (`GET /api/config`, `PUT /api/config`) reads and writes the config file directly. The gateway watches the file and hot-reloads most changes automatically — only gateway server settings (port, bind, auth) need a restart. Secrets (gateway token) are masked in API responses and preserved on save.
 
