@@ -70,8 +70,12 @@ function ChatPage() {
             </div>
           )}
 
-          {messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
+          {messages.map((message, index) => (
+            <MessageBubble
+              key={message.id}
+              message={message}
+              isStreaming={isLoading && index === messages.length - 1}
+            />
           ))}
 
           {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
@@ -132,17 +136,22 @@ function ChatPage() {
   )
 }
 
-function MessageBubble({ message }: { message: UIMessage }) {
+function MessageBubble({
+  message,
+  isStreaming = false,
+}: {
+  message: UIMessage
+  isStreaming?: boolean
+}) {
   const isUser = message.role === 'user'
   const displayParts = buildMessageDisplayParts(message.parts)
   const toolCalls = displayParts
-    .filter((part): part is { type: 'tool-call'; toolCall: ToolCallViewModel } => part.type === 'tool-call')
+    .filter(
+      (part): part is { type: 'tool-call'; toolCall: ToolCallViewModel } =>
+        part.type === 'tool-call',
+    )
     .map((part) => part.toolCall)
-  const hasActiveToolCalls = toolCalls.some(
-    (toolCall) =>
-      toolCall.status === 'running' || toolCall.status === 'waiting-for-output',
-  )
-  let hasRenderedCollapsedToolCalls = false
+  let hasRenderedToolCallGroup = false
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -154,12 +163,16 @@ function MessageBubble({ message }: { message: UIMessage }) {
         }`}
       >
         {displayParts.map((part, i) => {
-          if (part.type === 'tool-call' && !hasActiveToolCalls) {
-            if (hasRenderedCollapsedToolCalls) {
-              return null
-            }
-            hasRenderedCollapsedToolCalls = true
-            return <ToolCallGroupCard key="tool-call-group" toolCalls={toolCalls} />
+          if (part.type === 'tool-call') {
+            if (hasRenderedToolCallGroup) return null
+            hasRenderedToolCallGroup = true
+            return (
+              <ToolCallGroupCard
+                key="tool-call-group"
+                toolCalls={toolCalls}
+                forceOpen={isStreaming}
+              />
+            )
           }
 
           if (part.type === 'text') {
@@ -171,7 +184,10 @@ function MessageBubble({ message }: { message: UIMessage }) {
               )
             }
             return (
-              <div key={i} className="prose prose-sm dark:prose-invert max-w-none leading-snug [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_li]:my-0">
+              <div
+                key={i}
+                className="prose prose-sm dark:prose-invert max-w-none leading-snug [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_li]:my-0"
+              >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {part.content}
                 </ReactMarkdown>
@@ -179,7 +195,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
             )
           }
 
-          return <ToolCallCard key={i} toolCall={part.toolCall} />
+          return null
         })}
       </div>
     </div>
@@ -271,10 +287,23 @@ function ToolCallCard({ toolCall }: { toolCall: ToolCallViewModel }) {
 
 function ToolCallGroupCard({
   toolCalls,
+  forceOpen = false,
 }: {
   toolCalls: Array<ToolCallViewModel>
+  forceOpen?: boolean
 }) {
-  const [isOpen, setIsOpen] = useState(false)
+  const [manualToggle, setManualToggle] = useState<boolean | null>(null)
+
+  // Reset manual override when streaming ends so container collapses
+  const prevForceOpen = useRef(forceOpen)
+  useEffect(() => {
+    if (prevForceOpen.current && !forceOpen) {
+      setManualToggle(null)
+    }
+    prevForceOpen.current = forceOpen
+  }, [forceOpen])
+
+  const isOpen = manualToggle ?? forceOpen
   const summaryLabel =
     toolCalls.length === 1 ? '1 tool call' : `${toolCalls.length} tool calls`
   const completedCount = toolCalls.filter(
@@ -288,7 +317,7 @@ function ToolCallGroupCard({
     <div className="my-2 overflow-hidden rounded-xl border border-slate-300/70 bg-white/70 dark:border-slate-600 dark:bg-slate-800/60">
       <button
         type="button"
-        onClick={() => setIsOpen((current) => !current)}
+        onClick={() => setManualToggle((prev) => !(prev ?? forceOpen))}
         className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
       >
         <div className="flex min-w-0 items-center gap-2">
