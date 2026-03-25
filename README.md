@@ -121,6 +121,10 @@ Streaming tool call events rendered as expandable UI cards:
 
 <img src="docs/screenshots/tool-calls.png" alt="Tool Call Visualization" width="600">
 
+### Image Attachments
+
+Not implemented due to a [known upstream bug](https://github.com/openclaw/openclaw/issues/23452) — OpenClaw's gateway accepts image attachments in `chat.send` but does not forward them to vision-capable models. This affects multiple channels (Discord, Telegram, WebChat, OpenWebUI). Fix PRs [#43489](https://github.com/openclaw/openclaw/pull/43489) and [#50587](https://github.com/openclaw/openclaw/pull/50587) are in progress upstream.
+
 ### Config Generator
 
 A web UI at `/config` to view and update the OpenClaw configuration file (`openclaw.json`) programmatically — no manual JSON editing required.
