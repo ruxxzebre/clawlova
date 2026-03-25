@@ -1,9 +1,57 @@
 services:
-  openclaw-gateway:
-    image: ${OPENCLAW_IMAGE:-openclaw:local}
+  openclaw-init:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    user: "0:0"
     environment:
       HOME: /home/node
       TERM: xterm-256color
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+      OPENCLAW_CONFIG_ROOT: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_BOOTSTRAP_TOKEN_FILE: /home/node/.openclaw/.gateway-token
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
+      OPENCLAW_GATEWAY_PORT: 18789
+      OPENCLAW_UID: ${OPENCLAW_UID:-1000}
+      OPENCLAW_GID: ${OPENCLAW_GID:-1000}
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
+      - ./scripts:/bootstrap:ro
+    entrypoint: ["/bin/sh", "/bootstrap/openclaw-init.sh"]
+
+  cockpit-bootstrap:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    user: "0:0"
+    network_mode: "service:openclaw-gateway"
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENCLAW_CONFIG_ROOT: /home/node/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace
+      OPENCLAW_BOOTSTRAP_TOKEN_FILE: /home/node/.openclaw/.gateway-token
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
+      OPENCLAW_GATEWAY_URL: http://127.0.0.1:18789
+      OPENCLAW_DEVICE_FILE: /var/lib/cockpit/openclaw-device.json
+      OPENCLAW_DEVICE_TOKEN_FILE: /var/lib/cockpit/openclaw-device-token
+      OPENCLAW_BOOTSTRAP_WAIT_SECONDS: ${OPENCLAW_BOOTSTRAP_WAIT_SECONDS:-90}
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
+      - cockpit-state:/var/lib/cockpit
+      - ./scripts:/bootstrap:ro
+    entrypoint: ["/bin/sh", "/bootstrap/local-bootstrap.sh"]
+    depends_on:
+      openclaw-gateway:
+        condition: service_healthy
+
+  openclaw-gateway:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
@@ -11,8 +59,8 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
       ## Uncomment the lines below to enable sandbox isolation
       ## (agents.defaults.sandbox). Requires Docker CLI in the image
       ## (build with --build-arg OPENCLAW_INSTALL_DOCKER_CLI=1) or use
@@ -26,6 +74,9 @@ services:
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
     init: true
     restart: unless-stopped
+    depends_on:
+      openclaw-init:
+        condition: service_completed_successfully
     command:
       [
         "node",
@@ -51,20 +102,28 @@ services:
 
   cockpit:
     build:
-      context: ./packages/cockpit
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: packages/cockpit/Dockerfile
     ports:
       - "${COCKPIT_PORT:-3000}:3000"
+    volumes:
+      - openclaw-config:/openclaw-config:ro
+      - cockpit-state:/var/lib/cockpit
     environment:
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
-      # OPENCLAW_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}  # TODO: enable when device auth is configured
+      OPENCLAW_CONFIG_ROOT: /openclaw-config
+      OPENCLAW_BOOTSTRAP_TOKEN_FILE: /openclaw-config/.gateway-token
+      OPENCLAW_DEVICE_FILE: /var/lib/cockpit/openclaw-device.json
+      OPENCLAW_DEVICE_TOKEN_FILE: /var/lib/cockpit/openclaw-device-token
     depends_on:
       openclaw-gateway:
         condition: service_healthy
+      cockpit-bootstrap:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   openclaw-cli:
-    image: ${OPENCLAW_IMAGE:-openclaw:local}
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
     network_mode: "service:openclaw-gateway"
     cap_drop:
       - NET_RAW
@@ -75,6 +134,7 @@ services:
       HOME: /home/node
       TERM: xterm-256color
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENCLAW_ALLOW_INSECURE_PRIVATE_WS: ${OPENCLAW_ALLOW_INSECURE_PRIVATE_WS:-}
       BROWSER: echo
       CLAUDE_AI_SESSION_KEY: ${CLAUDE_AI_SESSION_KEY:-}
@@ -82,11 +142,16 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
     volumes:
-      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
-      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - openclaw-config:/home/node/.openclaw
+      - openclaw-workspace:/home/node/.openclaw/workspace
     stdin_open: true
     tty: true
     init: true
     entrypoint: ["node", "dist/index.js"]
     depends_on:
       - openclaw-gateway
+
+volumes:
+  openclaw-config:
+  openclaw-workspace:
+  cockpit-state:
