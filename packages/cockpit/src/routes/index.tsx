@@ -175,6 +175,7 @@ function MessageBubble({
             )
           }
 
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
           if (part.type === 'text') {
             if (isUser) {
               return (

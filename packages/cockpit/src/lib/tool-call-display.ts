@@ -34,10 +34,21 @@ export function buildMessageDisplayParts(
 ): Array<MessageDisplayPart> {
   const displayParts: Array<MessageDisplayPart> = []
   const toolCalls = new Map<string, ToolCallViewModel>()
+  let accumulatedText = ''
 
   for (const part of parts) {
     if (part.type === 'text') {
-      displayParts.push({ type: 'text', content: part.content })
+      // During streaming, text parts after tool calls may contain the full
+      // accumulated text (including text already rendered before the tool
+      // calls). Strip the already-shown prefix to avoid duplication.
+      let content = part.content
+      if (accumulatedText && content.startsWith(accumulatedText)) {
+        content = content.slice(accumulatedText.length)
+      }
+      accumulatedText = part.content
+      if (content) {
+        displayParts.push({ type: 'text', content })
+      }
       continue
     }
 

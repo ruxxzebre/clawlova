@@ -74,6 +74,35 @@ describe('buildMessageDisplayParts', () => {
     expect(toolPart.toolCall.output).toBe('File not found')
   })
 
+  it('deduplicates text when post-tool text contains pre-tool prefix', () => {
+    const parts = [
+      { type: 'text', content: 'Hello there.' },
+      {
+        type: 'tool-call',
+        id: 'tool-dup',
+        name: 'save',
+        arguments: '{}',
+        state: 'input-complete',
+      },
+      {
+        type: 'tool-result',
+        toolCallId: 'tool-dup',
+        content: '"ok"',
+        state: 'complete',
+      },
+      { type: 'text', content: 'Hello there.Now continuing.' },
+    ] satisfies Array<MessagePart>
+
+    const displayParts = buildMessageDisplayParts(parts)
+
+    expect(displayParts).toHaveLength(3)
+    expect(displayParts[0]).toEqual({ type: 'text', content: 'Hello there.' })
+    expect(displayParts[2]).toEqual({
+      type: 'text',
+      content: 'Now continuing.',
+    })
+  })
+
   it('keeps streaming tool input in running state', () => {
     const parts = [
       {
