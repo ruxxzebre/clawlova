@@ -7,7 +7,7 @@ import {
   createOpenClawSessionStream,
   deriveSessionKey,
   extractLatestUserMessageText,
-  resolveConnectToken,
+  resolveAuthMode,
   translateGatewayEvent,
 } from './openclaw-session-bridge'
 
@@ -15,17 +15,6 @@ function createState() {
   return {
     runId: 'run-1',
     messageId: 'msg-1',
-    startedAt: 100,
-    sessionKey: 'agent:main:chat-test',
-    prompt: 'hello',
-    connectToken: 'token',
-    cachedDeviceToken: null,
-    deviceTokenFile: '/tmp/openclaw-device-token',
-    deviceIdentity: {
-      id: 'device-1',
-      publicKey: 'public-key',
-      privateKey: 'private-key',
-    },
     pendingToolCalls: new Map(),
     textStarted: false,
     textContent: '',
@@ -34,6 +23,17 @@ function createState() {
 
 class MockWebSocket {
   static instances: MockWebSocket[] = []
+  static connectResponse:
+    | Record<string, unknown>
+    | ((frame: Record<string, unknown>) => Record<string, unknown>) = {
+    type: 'res',
+    ok: true,
+    payload: {
+      auth: {
+        deviceToken: 'persisted-device-token',
+      },
+    },
+  }
 
   private listeners = new Map<string, Set<(event: any) => void>>()
   sentFrames: Array<Record<string, unknown>> = []
@@ -69,17 +69,15 @@ class MockWebSocket {
     this.sentFrames.push(frame)
 
     if (frame['method'] === 'connect') {
+      const response =
+        typeof MockWebSocket.connectResponse === 'function'
+          ? MockWebSocket.connectResponse(frame)
+          : MockWebSocket.connectResponse
       queueMicrotask(() => {
         this.emit('message', {
           data: JSON.stringify({
-            type: 'res',
+            ...response,
             id: frame['id'],
-            ok: true,
-            payload: {
-              auth: {
-                deviceToken: 'persisted-device-token',
-              },
-            },
           }),
         })
       })
@@ -143,6 +141,15 @@ const originalEnv = { ...process.env }
 
 beforeEach(() => {
   MockWebSocket.instances = []
+  MockWebSocket.connectResponse = {
+    type: 'res',
+    ok: true,
+    payload: {
+      auth: {
+        deviceToken: 'persisted-device-token',
+      },
+    },
+  }
   vi.stubGlobal('WebSocket', MockWebSocket as unknown as typeof WebSocket)
 })
 
@@ -186,25 +193,32 @@ describe('deriveSessionKey', () => {
   })
 })
 
-describe('resolveConnectToken', () => {
+describe('resolveAuthMode', () => {
   it('prefers a cached device token', () => {
     expect(
-      resolveConnectToken({
+      resolveAuthMode({
         cachedDeviceToken: 'cached-token',
-        gatewayToken: null,
-        allowDevGatewayTokenFallback: false,
+        bootstrapGatewayToken: null,
       }),
-    ).toBe('cached-token')
+    ).toBe('device-token')
   })
 
-  it('throws when first pairing is impossible outside development', () => {
-    expect(() =>
-      resolveConnectToken({
+  it('falls back to explicit bootstrap auth when no device token exists', () => {
+    expect(
+      resolveAuthMode({
         cachedDeviceToken: null,
-        gatewayToken: null,
-        allowDevGatewayTokenFallback: false,
+        bootstrapGatewayToken: 'gateway-token',
       }),
-    ).toThrow(/OPENCLAW_GATEWAY_TOKEN/)
+    ).toBe('bootstrap-token')
+  })
+
+  it('throws when neither cached auth nor bootstrap auth exists', () => {
+    expect(() =>
+      resolveAuthMode({
+        cachedDeviceToken: null,
+        bootstrapGatewayToken: null,
+      }),
+    ).toThrow(/OPENCLAW_GATEWAY_TOKEN|OPENCLAW_BOOTSTRAP_TOKEN_FILE/)
   })
 })
 
@@ -299,7 +313,7 @@ describe('translateGatewayEvent', () => {
 })
 
 describe('createOpenClawSessionStream auth flow', () => {
-  it('uses the gateway token on first pairing and persists the returned device token', async () => {
+  it('uses bootstrap auth on first pair and persists the returned device token', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cockpit-bridge-'))
     try {
       process.env['NODE_ENV'] = 'production'
@@ -317,9 +331,9 @@ describe('createOpenClawSessionStream auth flow', () => {
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',
       )
-      expect(connectFrame).toBeTruthy()
       expect(connectFrame?.['params']).toMatchObject({
         auth: { token: 'gateway-token' },
+        client: { mode: 'cli' },
       })
       await expect(
         readFile(process.env['OPENCLAW_DEVICE_TOKEN_FILE'] as string, 'utf8'),
@@ -330,7 +344,7 @@ describe('createOpenClawSessionStream auth flow', () => {
     }
   })
 
-  it('prefers a cached device token and does not require a gateway token', async () => {
+  it('prefers a cached device token and does not require bootstrap auth', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cockpit-bridge-'))
     const tokenFile = path.join(tempDir, 'openclaw-device-token')
     try {
@@ -355,7 +369,42 @@ describe('createOpenClawSessionStream auth flow', () => {
     }
   })
 
-  it('returns an explicit error when neither a cached device token nor gateway token is present', async () => {
+  it('returns a clear bootstrap error when first pair is still pending', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cockpit-bridge-'))
+    try {
+      process.env['NODE_ENV'] = 'production'
+      process.env['OPENCLAW_GATEWAY_TOKEN'] = 'gateway-token'
+      process.env['OPENCLAW_DEVICE_FILE'] = path.join(tempDir, 'openclaw-device.json')
+      process.env['OPENCLAW_DEVICE_TOKEN_FILE'] = path.join(
+        tempDir,
+        'openclaw-device-token',
+      )
+      MockWebSocket.connectResponse = {
+        type: 'res',
+        ok: false,
+        error: {
+          message: 'pairing required',
+          code: 'PAIRING_REQUIRED',
+        },
+      }
+
+      const chunks = await collectStreamChunks([
+        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
+      ] as Array<UIMessage>)
+
+      expect(chunks).toHaveLength(1)
+      expect(chunks[0]).toMatchObject({
+        type: 'RUN_ERROR',
+        error: {
+          message: expect.stringMatching(/bootstrap did not finish/),
+        },
+      })
+    } finally {
+      await rm(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns an explicit error when neither cached auth nor bootstrap auth exists', async () => {
     const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cockpit-bridge-'))
     try {
       process.env['NODE_ENV'] = 'production'
@@ -375,10 +424,41 @@ describe('createOpenClawSessionStream auth flow', () => {
       expect(chunks[0]).toMatchObject({
         type: 'RUN_ERROR',
         error: {
-          message: expect.stringMatching(/OPENCLAW_GATEWAY_TOKEN/),
+          message: expect.stringMatching(
+            /OPENCLAW_GATEWAY_TOKEN|OPENCLAW_BOOTSTRAP_TOKEN_FILE/,
+          ),
         },
       })
       expect(MockWebSocket.instances).toHaveLength(0)
+    } finally {
+      await rm(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it('loads the bootstrap token from a shared token file', async () => {
+    const tempDir = await mkdtemp(path.join(os.tmpdir(), 'cockpit-bridge-'))
+    const tokenFile = path.join(tempDir, '.gateway-token')
+    try {
+      process.env['NODE_ENV'] = 'production'
+      delete process.env['OPENCLAW_GATEWAY_TOKEN']
+      process.env['OPENCLAW_BOOTSTRAP_TOKEN_FILE'] = tokenFile
+      process.env['OPENCLAW_DEVICE_FILE'] = path.join(tempDir, 'openclaw-device.json')
+      process.env['OPENCLAW_DEVICE_TOKEN_FILE'] = path.join(
+        tempDir,
+        'openclaw-device-token',
+      )
+      await writeFile(tokenFile, 'file-bootstrap-token\n', 'utf8')
+
+      await collectStreamChunks([
+        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
+      ] as Array<UIMessage>)
+
+      const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
+        (frame) => frame['method'] === 'connect',
+      )
+      expect(connectFrame?.['params']).toMatchObject({
+        auth: { token: 'file-bootstrap-token' },
+      })
     } finally {
       await rm(tempDir, { recursive: true, force: true })
     }

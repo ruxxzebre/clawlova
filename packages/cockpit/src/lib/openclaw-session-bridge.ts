@@ -10,11 +10,10 @@ import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
 const DEFAULT_GATEWAY_URL = 'http://localhost:18789'
-const DEFAULT_DEV_GATEWAY_TOKEN =
-  '84a282e900a37b9eeaaf3fc71416074da9e8de43021008cd'
 const DEFAULT_DEVICE_FILE = '/var/lib/cockpit/openclaw-device.json'
 const DEFAULT_DEVICE_TOKEN_FILE = '/var/lib/cockpit/openclaw-device-token'
 const DEFAULT_SCOPES = ['operator.read', 'operator.write']
+const PAIRING_REQUIRED_CODE = 'PAIRING_REQUIRED'
 
 interface SessionBridgeOptions {
   messages: Array<UIMessage>
@@ -36,10 +35,17 @@ interface PendingToolCall {
 
 interface BridgeConfig {
   gatewayUrl: string
-  gatewayToken: string | null
   deviceFile: string
   deviceTokenFile: string
-  allowDevGatewayTokenFallback: boolean
+  bootstrapGatewayToken: string | null
+  bootstrapTokenFile: string | null
+}
+
+interface BridgeAuthState {
+  deviceIdentity: DeviceIdentity
+  cachedDeviceToken: string | null
+  connectToken: string
+  mode: 'device-token' | 'bootstrap-token'
 }
 
 interface GatewayState {
@@ -48,10 +54,8 @@ interface GatewayState {
   startedAt: number
   sessionKey: string
   prompt: string
-  connectToken: string
-  cachedDeviceToken: string | null
+  auth: BridgeAuthState
   deviceTokenFile: string
-  deviceIdentity: DeviceIdentity
   pendingToolCalls: Map<string, PendingToolCall>
   textStarted: boolean
   textContent: string
@@ -116,13 +120,7 @@ async function runSessionBridge(
     }
 
     const config = getBridgeConfig()
-    const cachedDeviceToken = await loadDeviceToken(config.deviceTokenFile)
-    const connectToken = resolveConnectToken({
-      cachedDeviceToken,
-      gatewayToken: config.gatewayToken,
-      allowDevGatewayTokenFallback: config.allowDevGatewayTokenFallback,
-    })
-    const deviceIdentity = await loadOrCreateDeviceIdentity(config.deviceFile)
+    const auth = await loadBridgeAuthState(config)
     const sessionKey = options.sessionKey ?? deriveSessionKey(options.messages)
     const state: GatewayState = {
       runId,
@@ -130,10 +128,8 @@ async function runSessionBridge(
       startedAt: Date.now(),
       sessionKey,
       prompt,
-      connectToken,
-      cachedDeviceToken,
+      auth,
       deviceTokenFile: config.deviceTokenFile,
-      deviceIdentity,
       pendingToolCalls: new Map(),
       textStarted: false,
       textContent: '',
@@ -151,6 +147,30 @@ async function runSessionBridge(
     }
   } finally {
     queue.close()
+  }
+}
+
+async function loadBridgeAuthState(config: BridgeConfig): Promise<BridgeAuthState> {
+  const deviceIdentity = await loadOrCreateDeviceIdentity(config.deviceFile)
+  const cachedDeviceToken = await loadDeviceToken(config.deviceTokenFile)
+  const bootstrapGatewayToken =
+    config.bootstrapGatewayToken ??
+    (config.bootstrapTokenFile
+      ? await loadOptionalToken(config.bootstrapTokenFile)
+      : null)
+  const mode = resolveAuthMode({
+    cachedDeviceToken,
+    bootstrapGatewayToken,
+  })
+
+  return {
+    deviceIdentity,
+    cachedDeviceToken,
+    connectToken:
+      mode === 'device-token'
+        ? (cachedDeviceToken as string)
+        : (bootstrapGatewayToken as string),
+    mode,
   }
 }
 
@@ -224,10 +244,10 @@ async function streamViaGatewayWebSocket(options: {
               id: connectRequestId,
               method: 'connect',
               params: buildConnectParams({
-                deviceIdentity: options.state.deviceIdentity,
+                deviceIdentity: options.state.auth.deviceIdentity,
                 nonce,
                 ts,
-                token: options.state.connectToken,
+                token: options.state.auth.connectToken,
               }),
             }),
           )
@@ -236,12 +256,15 @@ async function streamViaGatewayWebSocket(options: {
 
         if (frame.type === 'res' && frame.id === connectRequestId) {
           if (!frame.ok) {
-            throwGatewayError('connect', frame.error)
+            handleConnectError(frame.error, options.state.auth.mode)
           }
 
-          const deviceToken = asString(frame.payload?.['auth'] as Record<string, unknown> | undefined, 'deviceToken')
-          if (deviceToken && deviceToken !== options.state.cachedDeviceToken) {
-            options.state.cachedDeviceToken = deviceToken
+          const deviceToken = asString(
+            frame.payload?.['auth'] as Record<string, unknown> | undefined,
+            'deviceToken',
+          )
+          if (deviceToken && deviceToken !== options.state.auth.cachedDeviceToken) {
+            options.state.auth.cachedDeviceToken = deviceToken
             await persistDeviceToken(options.state.deviceTokenFile, deviceToken)
           }
 
@@ -277,7 +300,10 @@ async function streamViaGatewayWebSocket(options: {
           return
         }
 
-        if (frame.type === 'event' && (frame.event === 'chat' || frame.event === 'agent')) {
+        if (
+          frame.type === 'event' &&
+          (frame.event === 'chat' || frame.event === 'agent')
+        ) {
           const translation = translateGatewayEvent(frame.payload ?? {}, options.state)
           for (const chunk of translation.chunks) {
             options.queue.push(chunk)
@@ -340,9 +366,26 @@ function buildConnectParams(options: {
   }
 }
 
+function handleConnectError(
+  error: GatewayResponseFrame['error'],
+  mode: BridgeAuthState['mode'],
+): never {
+  const code = error?.details?.code ?? error?.code
+  if (code === PAIRING_REQUIRED_CODE && mode === 'bootstrap-token') {
+    throw new Error(
+      'Cockpit device bootstrap did not finish before chat traffic started. Check `docker compose logs openclaw-init cockpit-bootstrap openclaw-gateway` and retry once initialization completes.',
+    )
+  }
+
+  throwGatewayError('connect', error)
+}
+
 export function translateGatewayEvent(
   payload: Record<string, unknown>,
-  state: GatewayState,
+  state: Pick<
+    GatewayState,
+    'messageId' | 'pendingToolCalls' | 'runId' | 'textContent' | 'textStarted'
+  >,
 ): TranslationResult {
   const timestamp = Date.now()
   const chunks: Array<StreamChunk> = []
@@ -351,7 +394,9 @@ export function translateGatewayEvent(
   const data = asRecord(payload['data'])
 
   const textDelta =
-    asString(data?.['delta']) ?? asString(data?.['content']) ?? asString(data?.['text'])
+    asString(data?.['delta']) ??
+    asString(data?.['content']) ??
+    asString(data?.['text'])
   if (stream === 'assistant' && textDelta) {
     if (!state.textStarted) {
       state.textStarted = true
@@ -433,21 +478,20 @@ export function translateGatewayEvent(
       })
     }
 
+    const finishReason = normalizeFinishReason(
+      asString(payload['finishReason']) ?? asString(data?.['finishReason']),
+    )
     chunks.push({
       type: 'RUN_FINISHED',
       runId: state.runId,
       model: 'openclaw',
       timestamp,
-      finishReason: normalizeFinishReason(
-        asString(payload['finishReason']) ?? asString(data?.['finishReason']),
-      ),
+      finishReason,
     })
 
     return {
       chunks,
-      finishReason: normalizeFinishReason(
-        asString(payload['finishReason']) ?? asString(data?.['finishReason']),
-      ),
+      finishReason,
       done: true,
     }
   }
@@ -464,8 +508,9 @@ export function extractLatestUserMessageText(
       continue
     }
 
-    if (typeof message.content === 'string' && message.content.trim()) {
-      return message.content.trim()
+    const legacyContent = (message as { content?: unknown }).content
+    if (typeof legacyContent === 'string' && legacyContent.trim()) {
+      return legacyContent.trim()
     }
 
     const text = (message.parts ?? [])
@@ -492,33 +537,28 @@ export function deriveSessionKey(messages: Array<UIMessage>): string {
 function getBridgeConfig(): BridgeConfig {
   return {
     gatewayUrl: process.env['OPENCLAW_GATEWAY_URL'] ?? DEFAULT_GATEWAY_URL,
-    gatewayToken: readEnvValue('OPENCLAW_GATEWAY_TOKEN'),
+    bootstrapGatewayToken: readEnvValue('OPENCLAW_GATEWAY_TOKEN'),
+    bootstrapTokenFile: readEnvValue('OPENCLAW_BOOTSTRAP_TOKEN_FILE'),
     deviceFile: process.env['OPENCLAW_DEVICE_FILE'] ?? DEFAULT_DEVICE_FILE,
     deviceTokenFile:
       process.env['OPENCLAW_DEVICE_TOKEN_FILE'] ?? DEFAULT_DEVICE_TOKEN_FILE,
-    allowDevGatewayTokenFallback: isDevelopmentMode(),
   }
 }
 
-export function resolveConnectToken(options: {
+export function resolveAuthMode(options: {
   cachedDeviceToken: string | null
-  gatewayToken: string | null
-  allowDevGatewayTokenFallback: boolean
-}): string {
+  bootstrapGatewayToken: string | null
+}): BridgeAuthState['mode'] {
   if (options.cachedDeviceToken) {
-    return options.cachedDeviceToken
+    return 'device-token'
   }
 
-  if (options.gatewayToken) {
-    return options.gatewayToken
-  }
-
-  if (options.allowDevGatewayTokenFallback) {
-    return DEFAULT_DEV_GATEWAY_TOKEN
+  if (options.bootstrapGatewayToken) {
+    return 'bootstrap-token'
   }
 
   throw new Error(
-    'OpenClaw device auth is not configured: set OPENCLAW_GATEWAY_TOKEN for first pairing or provide a persisted OPENCLAW_DEVICE_TOKEN.',
+    'Cockpit device auth is not configured: provide a persisted device token or a bootstrap token via OPENCLAW_GATEWAY_TOKEN or OPENCLAW_BOOTSTRAP_TOKEN_FILE.',
   )
 }
 
@@ -539,6 +579,9 @@ async function loadOrCreateDeviceIdentity(
 
   const { publicKey, privateKey } = generateKeyPairSync('ed25519')
   const jwk = publicKey.export({ format: 'jwk' })
+  if (!jwk.x) {
+    throw new Error('Failed to export OpenClaw device public key')
+  }
   const publicKeyRaw = Buffer.from(jwk.x, 'base64url')
   const identity: DeviceIdentity = {
     id: createHash('sha256').update(publicKeyRaw).digest('hex'),
@@ -564,13 +607,18 @@ async function loadDeviceToken(deviceTokenFile: string): Promise<string | null> 
   }
 }
 
+async function loadOptionalToken(tokenFile: string): Promise<string | null> {
+  try {
+    const token = await fs.readFile(tokenFile, 'utf8')
+    return token.trim() || null
+  } catch {
+    return null
+  }
+}
+
 function readEnvValue(name: string): string | null {
   const value = process.env[name]?.trim()
   return value ? value : null
-}
-
-function isDevelopmentMode(): boolean {
-  return process.env['NODE_ENV'] !== 'production'
 }
 
 async function persistDeviceToken(
