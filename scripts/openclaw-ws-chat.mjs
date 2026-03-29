@@ -4,9 +4,11 @@ import path from 'node:path'
 
 const DEFAULT_SCOPES = ['operator.read', 'operator.write']
 const DEFAULT_GATEWAY_HTTP_URL = 'http://localhost:18789'
-const DEFAULT_GATEWAY_TOKEN =
-  process.env.OPENCLAW_GATEWAY_TOKEN ??
-  '84a282e900a37b9eeaaf3fc71416074da9e8de43021008cd'
+const DEFAULT_GATEWAY_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN
+if (!DEFAULT_GATEWAY_TOKEN) {
+  console.error('Error: OPENCLAW_GATEWAY_TOKEN environment variable is required.\nSet it in your .env file or export it before running this script.')
+  process.exit(1)
+}
 const DEFAULT_DEVICE_FILE = path.resolve(process.cwd(), '.openclaw-device.json')
 const DEFAULT_DEVICE_TOKEN_FILE = path.resolve(process.cwd(), '.openclaw-device-token')
 
@@ -200,6 +202,26 @@ function handleStreamEvent(payload, state) {
   const stream = payload.stream
   const data = payload.data ?? {}
   const lifecycle = payload.lifecycle
+
+  // Handle "final" messages from slash commands (/status, /thinking, etc.)
+  if (payload.state === 'final' && payload.message) {
+    const message = payload.message
+    const content = Array.isArray(message.content)
+      ? message.content
+          .filter((p) => p.type === 'text' && typeof p.text === 'string')
+          .map((p) => p.text)
+          .join('')
+      : typeof message.content === 'string'
+        ? message.content
+        : ''
+    if (content) {
+      process.stdout.write(content)
+    }
+    state.done = true
+    process.stdout.write('\n')
+    setTimeout(() => process.exit(0), 50)
+    return
+  }
 
   if (stream === 'assistant' && typeof data.delta === 'string' && data.delta.length > 0) {
     process.stdout.write(data.delta)

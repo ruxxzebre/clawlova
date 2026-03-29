@@ -12,3 +12,8 @@ openclaw-workspace
 .gateway-token
 skills-lock.json
 data
+.env.local
+.env*.local
+.vscode/
+.idea/
+settings.local.json

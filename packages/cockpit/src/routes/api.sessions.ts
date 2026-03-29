@@ -10,9 +10,10 @@ export const Route = createFileRoute('/api/sessions')({
           return new Response(JSON.stringify(sessions), {
             headers: { 'Content-Type': 'application/json' },
           })
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to list sessions'
           return new Response(
-            JSON.stringify({ error: err.message ?? 'Failed to list sessions' }),
+            JSON.stringify({ error: message }),
             { status: 500, headers: { 'Content-Type': 'application/json' } },
           )
         }

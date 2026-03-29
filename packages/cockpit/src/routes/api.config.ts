@@ -16,9 +16,10 @@ export const Route = createFileRoute('/api/config')({
           return new Response(JSON.stringify(sanitizeConfig(config)), {
             headers: { 'Content-Type': 'application/json' },
           })
-        } catch (err: any) {
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : 'Failed to read config'
           return new Response(
-            JSON.stringify({ error: err.message ?? 'Failed to read config' }),
+            JSON.stringify({ error: message }),
             { status: 500, headers: { 'Content-Type': 'application/json' } },
           )
         }
@@ -37,11 +38,12 @@ export const Route = createFileRoute('/api/config')({
             JSON.stringify({ ok: true, restartRequired }),
             { headers: { 'Content-Type': 'application/json' } },
           )
-        } catch (err: any) {
-          const status = err.name === 'ZodError' ? 400 : 500
+        } catch (err: unknown) {
+          const isValidation = err instanceof Error && err.name === 'ZodError'
+          const message = err instanceof Error ? err.message : 'Failed to write config'
           return new Response(
-            JSON.stringify({ error: err.message ?? 'Failed to write config' }),
-            { status, headers: { 'Content-Type': 'application/json' } },
+            JSON.stringify({ error: message }),
+            { status: isValidation ? 400 : 500, headers: { 'Content-Type': 'application/json' } },
           )
         }
       },

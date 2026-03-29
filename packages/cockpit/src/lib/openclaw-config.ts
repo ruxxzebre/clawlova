@@ -15,12 +15,12 @@ function getConfigPath(): string {
 // Read / Write
 // ---------------------------------------------------------------------------
 
-export async function readConfig(): Promise<Record<string, any>> {
+export async function readConfig(): Promise<Record<string, unknown>> {
   const raw = await fs.readFile(getConfigPath(), 'utf8')
   return JSON.parse(raw)
 }
 
-export async function writeConfig(config: Record<string, any>): Promise<void> {
+export async function writeConfig(config: Record<string, unknown>): Promise<void> {
   await fs.writeFile(getConfigPath(), JSON.stringify(config, null, 2) + '\n', 'utf8')
 }
 
@@ -30,12 +30,14 @@ export async function writeConfig(config: Record<string, any>): Promise<void> {
 
 const SECRET_MASK = '••••••••'
 
-export function sanitizeConfig(config: Record<string, any>): Record<string, any> {
+export function sanitizeConfig(config: Record<string, unknown>): Record<string, unknown> {
   const out = structuredClone(config)
 
   // Mask gateway auth token
-  if (out.gateway?.auth?.token) {
-    out.gateway.auth.token = SECRET_MASK
+  const gw = out.gateway as Record<string, unknown> | undefined
+  const gwAuth = gw?.auth as Record<string, unknown> | undefined
+  if (gwAuth?.token) {
+    gwAuth.token = SECRET_MASK
   }
 
   return out
@@ -103,8 +105,8 @@ const EditableSectionsSchema = z.object({
   plugins: PluginsSchema.optional(),
 }).passthrough()
 
-export function validateEditableSections(config: Record<string, any>): void {
-  const partial: Record<string, any> = {}
+export function validateEditableSections(config: Record<string, unknown>): void {
+  const partial: Record<string, unknown> = {}
   for (const key of ['auth', 'agents', 'tools', 'gateway', 'plugins']) {
     if (config[key] !== undefined) partial[key] = config[key]
   }
@@ -115,10 +117,12 @@ export function validateEditableSections(config: Record<string, any>): void {
 // Sanitize config before writing — strip fields OpenClaw doesn't recognize
 // ---------------------------------------------------------------------------
 
-function stripUnknownAuthFields(config: Record<string, any>): void {
-  if (!config.auth?.profiles) return
+function stripUnknownAuthFields(config: Record<string, unknown>): void {
+  const auth = config.auth as Record<string, unknown> | undefined
+  if (!auth?.profiles) return
+  const profiles = auth.profiles as Record<string, Record<string, unknown>>
   const ALLOWED_AUTH_FIELDS = new Set(['provider', 'mode'])
-  for (const profile of Object.values(config.auth.profiles) as Record<string, any>[]) {
+  for (const profile of Object.values(profiles)) {
     for (const key of Object.keys(profile)) {
       if (!ALLOWED_AUTH_FIELDS.has(key)) {
         delete profile[key]
@@ -133,14 +137,16 @@ function stripUnknownAuthFields(config: Record<string, any>): void {
 
 const EDITABLE_KEYS = ['auth', 'agents', 'tools', 'gateway', 'plugins'] as const
 
-function deepMerge(target: any, source: any): any {
+function deepMerge(target: unknown, source: unknown): unknown {
   if (source === null || source === undefined) return target
   if (typeof source !== 'object' || Array.isArray(source)) return source
-  if (typeof target !== 'object' || Array.isArray(target)) return source
+  if (typeof target !== 'object' || target === null || Array.isArray(target)) return source
 
-  const result = { ...target }
-  for (const key of Object.keys(source)) {
-    result[key] = deepMerge(target[key], source[key])
+  const tgt = target as Record<string, unknown>
+  const src = source as Record<string, unknown>
+  const result: Record<string, unknown> = { ...tgt }
+  for (const key of Object.keys(src)) {
+    result[key] = deepMerge(tgt[key], src[key])
   }
   return result
 }
@@ -149,9 +155,9 @@ function deepMerge(target: any, source: any): any {
 const RESTART_FIELDS = ['port', 'bind', 'auth'] as const
 
 export function mergeConfig(
-  current: Record<string, any>,
-  updates: Record<string, any>,
-): { merged: Record<string, any>; restartRequired: boolean } {
+  current: Record<string, unknown>,
+  updates: Record<string, unknown>,
+): { merged: Record<string, unknown>; restartRequired: boolean } {
   const merged = structuredClone(current)
   let restartRequired = false
 
@@ -161,8 +167,12 @@ export function mergeConfig(
   }
 
   // Preserve masked secrets — gateway token
-  if (merged.gateway?.auth?.token === SECRET_MASK) {
-    merged.gateway.auth.token = current.gateway?.auth?.token
+  const mergedGw = merged.gateway as Record<string, unknown> | undefined
+  const mergedGwAuth = mergedGw?.auth as Record<string, unknown> | undefined
+  if (mergedGwAuth?.token === SECRET_MASK) {
+    const curGw = current.gateway as Record<string, unknown> | undefined
+    const curGwAuth = curGw?.auth as Record<string, unknown> | undefined
+    mergedGwAuth.token = curGwAuth?.token
   }
 
   // Strip fields that OpenClaw doesn't recognize in auth profiles
@@ -170,8 +180,8 @@ export function mergeConfig(
 
   // Detect gateway restart-requiring changes
   if (updates.gateway) {
-    const cur = current.gateway ?? {}
-    const upd = merged.gateway ?? {}
+    const cur = (current.gateway ?? {}) as Record<string, unknown>
+    const upd = (merged.gateway ?? {}) as Record<string, unknown>
     for (const field of RESTART_FIELDS) {
       if (JSON.stringify(cur[field]) !== JSON.stringify(upd[field])) {
         restartRequired = true

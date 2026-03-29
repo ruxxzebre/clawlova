@@ -285,6 +285,61 @@ describe('translateGatewayEvent', () => {
     })
   })
 
+  it('handles final messages from slash commands like /status', () => {
+    const state = createState()
+
+    const translated = translateGatewayEvent(
+      {
+        state: 'final',
+        message: {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: '🦞 OpenClaw 2026.3.28\n🧠 Model: openai/gpt-5.4' },
+          ],
+        },
+      },
+      state,
+    )
+
+    expect(translated.done).toBe(true)
+    expect(translated.chunks.map((chunk) => chunk.type)).toEqual([
+      'TEXT_MESSAGE_START',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_END',
+      'RUN_FINISHED',
+    ])
+
+    const contentChunk = translated.chunks.find(
+      (chunk) => chunk.type === 'TEXT_MESSAGE_CONTENT',
+    )
+    expect(contentChunk).toMatchObject({
+      delta: '🦞 OpenClaw 2026.3.28\n🧠 Model: openai/gpt-5.4',
+    })
+  })
+
+  it('handles final messages with string content', () => {
+    const state = createState()
+
+    const translated = translateGatewayEvent(
+      {
+        state: 'final',
+        message: {
+          role: 'assistant',
+          content: 'Thinking mode enabled.',
+        },
+      },
+      state,
+    )
+
+    expect(translated.done).toBe(true)
+    expect(translated.chunks.map((chunk) => chunk.type)).toEqual([
+      'TEXT_MESSAGE_START',
+      'TEXT_MESSAGE_CONTENT',
+      'TEXT_MESSAGE_END',
+      'RUN_FINISHED',
+    ])
+  })
+
   it('finishes the run on lifecycle end', () => {
     const state = createState()
     translateGatewayEvent(

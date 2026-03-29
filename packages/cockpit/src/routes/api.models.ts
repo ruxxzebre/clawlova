@@ -1,10 +1,19 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { readConfig } from '#/lib/openclaw-config'
 
+interface ModelEntry {
+  id: string
+  [key: string]: unknown
+}
+
+interface ModelsResponse {
+  data?: ModelEntry[]
+}
+
 interface ProviderConfig {
   baseUrl: string
   headers: (apiKey: string) => Record<string, string>
-  extractModels: (data: any) => string[]
+  extractModels: (data: ModelsResponse) => string[]
 }
 
 const PROVIDERS: Record<string, ProviderConfig> = {
@@ -13,8 +22,8 @@ const PROVIDERS: Record<string, ProviderConfig> = {
     headers: (key) => ({ Authorization: `Bearer ${key}` }),
     extractModels: (data) =>
       (data?.data ?? [])
-        .map((m: any) => m.id as string)
-        .filter((id: string) => /^(gpt-|o[1-9]|chatgpt-)/.test(id))
+        .map((m) => m.id)
+        .filter((id) => /^(gpt-|o[1-9]|chatgpt-)/.test(id))
         .sort(),
   },
   anthropic: {
@@ -24,7 +33,7 @@ const PROVIDERS: Record<string, ProviderConfig> = {
       'anthropic-version': '2023-06-01',
     }),
     extractModels: (data) =>
-      (data?.data ?? []).map((m: any) => m.id as string).sort(),
+      (data?.data ?? []).map((m) => m.id).sort(),
   },
 }
 
@@ -89,10 +98,10 @@ export const Route = createFileRoute('/api/models')({
         // Try to get API key from config
         let apiKey: string | undefined
         try {
-          const config = await readConfig()
+          const config = await readConfig() as { auth?: { profiles?: Record<string, { key?: string; apiKey?: string }> } }
           const profile = config.auth?.profiles?.[`${provider}:default`]
           apiKey = profile?.key ?? profile?.apiKey
-        } catch {}
+        } catch { /* config unavailable — fall through to env vars */ }
 
         // Also check env vars as fallback
         if (!apiKey || apiKey === '••••••••') {
@@ -131,13 +140,13 @@ export const Route = createFileRoute('/api/models')({
             )
           }
 
-          const data = await res.json()
+          const data = (await res.json()) as ModelsResponse
           const models = providerConfig.extractModels(data)
 
           return new Response(JSON.stringify({ models, source: 'live' }), {
             headers: { 'Content-Type': 'application/json' },
           })
-        } catch {
+        } catch { /* API unreachable — return fallbacks */
           return new Response(
             JSON.stringify({
               models: FALLBACK_MODELS[provider] ?? [],

@@ -393,6 +393,50 @@ export function translateGatewayEvent(
   const lifecycle = asString(payload['lifecycle'])
   const data = asRecord(payload['data'])
 
+  // Handle "final" messages (e.g. /status, /thinking) — the gateway returns the
+  // complete response in a single frame instead of streaming deltas.
+  const payloadState = asString(payload['state'])
+  const message = asRecord(payload['message'])
+  if (payloadState === 'final' && message) {
+    const fullText = extractMessageText(message)
+    if (fullText) {
+      if (!state.textStarted) {
+        state.textStarted = true
+        chunks.push({
+          type: 'TEXT_MESSAGE_START',
+          messageId: state.messageId,
+          role: 'assistant',
+          timestamp,
+        })
+      }
+
+      state.textContent += fullText
+      chunks.push({
+        type: 'TEXT_MESSAGE_CONTENT',
+        messageId: state.messageId,
+        delta: fullText,
+        content: state.textContent,
+        timestamp,
+      })
+
+      chunks.push({
+        type: 'TEXT_MESSAGE_END',
+        messageId: state.messageId,
+        timestamp,
+      })
+
+      chunks.push({
+        type: 'RUN_FINISHED',
+        runId: state.runId,
+        model: 'openclaw',
+        timestamp,
+        finishReason: 'stop',
+      })
+
+      return { chunks, finishReason: 'stop', done: true }
+    }
+  }
+
   const textDelta =
     asString(data?.['delta']) ??
     asString(data?.['content']) ??
@@ -693,6 +737,29 @@ function stringifyArgs(value: unknown): string {
     return value
   }
   return JSON.stringify(value)
+}
+
+/** Extract text from a gateway message object with `content: [{type:"text", text:"..."}]` */
+function extractMessageText(message: Record<string, unknown>): string | null {
+  const content = message['content']
+  if (typeof content === 'string') {
+    return content.trim() || null
+  }
+  if (Array.isArray(content)) {
+    const text = content
+      .filter(
+        (part): part is { type: string; text: string } =>
+          !!part &&
+          typeof part === 'object' &&
+          part.type === 'text' &&
+          typeof part.text === 'string',
+      )
+      .map((part) => part.text)
+      .join('')
+      .trim()
+    return text || null
+  }
+  return null
 }
 
 function stringifyResult(value: unknown): string {

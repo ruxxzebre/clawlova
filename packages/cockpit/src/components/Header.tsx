@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router'
-import { Plus, Settings } from 'lucide-react'
+import { Settings } from 'lucide-react'
 import ThemeToggle from './ThemeToggle'
 
 export default function Header() {
@@ -18,14 +18,6 @@ export default function Header() {
         </h2>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <Link
-            to="/"
-            search={{}}
-            className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-            title="New chat"
-          >
-            <Plus className="h-4 w-4" />
-          </Link>
           <Link
             to="/config"
             className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
