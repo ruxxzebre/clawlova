@@ -63,7 +63,7 @@ export default function ChatSidebar() {
         </button>
         <button
           type="button"
-          onClick={() => navigate({ to: '/', search: {} })}
+          onClick={() => navigate({ to: '/', search: { new: Date.now() } })}
           className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
           title="New chat"
         >
@@ -83,7 +83,7 @@ export default function ChatSidebar() {
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={() => navigate({ to: '/', search: {} })}
+            onClick={() => navigate({ to: '/', search: { new: Date.now() } })}
             className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-700 dark:hover:text-slate-200"
             title="New chat"
           >

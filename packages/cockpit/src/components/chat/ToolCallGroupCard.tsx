@@ -1,41 +1,32 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { ChevronDown, Wrench } from 'lucide-react'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
 import { ToolCallCard } from './ToolCallCard'
 
 export function ToolCallGroupCard({
   toolCalls,
-  forceOpen = false,
 }: {
   toolCalls: Array<ToolCallViewModel>
-  forceOpen?: boolean
 }) {
-  const [manualToggle, setManualToggle] = useState<boolean | null>(null)
+  const [isOpen, setIsOpen] = useState(false)
 
-  // Reset manual override when streaming ends so container collapses
-  const prevForceOpen = useRef(forceOpen)
-  useEffect(() => {
-    if (prevForceOpen.current && !forceOpen) {
-      setManualToggle(null)
-    }
-    prevForceOpen.current = forceOpen
-  }, [forceOpen])
-
-  const isOpen = manualToggle ?? forceOpen
   const summaryLabel =
     toolCalls.length === 1 ? '1 tool call' : `${toolCalls.length} tool calls`
   const completedCount = toolCalls.filter(
-    (toolCall) => toolCall.status === 'completed',
+    (tc) => tc.status === 'completed',
   ).length
-  const errorCount = toolCalls.filter(
-    (toolCall) => toolCall.status === 'error',
-  ).length
+  const errorCount = toolCalls.filter((tc) => tc.status === 'error').length
+
+  // Find the currently active tool call (running or waiting for output)
+  const activeTool = toolCalls.find(
+    (tc) => tc.status === 'running' || tc.status === 'waiting-for-output',
+  )
 
   return (
     <div className="my-2 overflow-hidden rounded-xl border border-slate-300/70 bg-white/70 dark:border-slate-600 dark:bg-slate-800/60">
       <button
         type="button"
-        onClick={() => setManualToggle((prev) => !(prev ?? forceOpen))}
+        onClick={() => setIsOpen((prev) => !prev)}
         className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
       >
         <div className="flex min-w-0 items-center gap-2">
@@ -44,7 +35,16 @@ export function ToolCallGroupCard({
           </span>
           <div className="min-w-0">
             <div className="truncate font-medium text-slate-900 dark:text-slate-100">
-              {summaryLabel}
+              {activeTool ? (
+                <>
+                  {summaryLabel}
+                  <span className="ml-1.5 font-normal text-amber-600 dark:text-amber-400">
+                    — {activeTool.name}
+                  </span>
+                </>
+              ) : (
+                summaryLabel
+              )}
             </div>
             <div className="text-xs text-slate-500 dark:text-slate-400">
               {errorCount > 0

@@ -268,13 +268,24 @@ export function translateJsonlToUIMessages(lines: string[]): UIMessage[] {
       }
 
       if (parts.length > 0) {
-        currentAssistant = {
-          id: entry.id,
-          role: 'assistant',
-          parts,
-          createdAt: timestamp,
+        const newHasText = parts.some((p) => p.type === 'text')
+        const newIsToolOnly = !newHasText
+        const prevHasText = currentAssistant?.parts.some((p) => p.type === 'text')
+
+        // Merge tool-call-only entries into the current assistant message,
+        // and merge into a following text message if no text was emitted yet.
+        // But keep sequential text messages as separate bubbles.
+        if (currentAssistant && (newIsToolOnly || !prevHasText)) {
+          currentAssistant.parts.push(...parts)
+        } else {
+          currentAssistant = {
+            id: entry.id,
+            role: 'assistant',
+            parts,
+            createdAt: timestamp,
+          }
+          messages.push(currentAssistant)
         }
-        messages.push(currentAssistant)
       }
     } else if (msg.role === 'toolResult') {
       // Attach tool result to the most recent assistant message

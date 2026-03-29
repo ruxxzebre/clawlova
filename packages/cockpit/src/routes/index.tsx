@@ -10,8 +10,11 @@ import { ThinkingDots } from '#/components/chat/ThinkingDots'
 
 export const Route = createFileRoute('/')({
   component: ChatPage,
-  validateSearch: (search: Record<string, unknown>): { session?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { session?: string; new?: number } => ({
     session: (search.session as string) || undefined,
+    new: search.new ? Number(search.new) : undefined,
   }),
 })
 
@@ -20,21 +23,11 @@ export const Route = createFileRoute('/')({
 // ---------------------------------------------------------------------------
 
 function ChatPage() {
-  const { session } = Route.useSearch()
+  const search = Route.useSearch()
+  const session = search.session
   const queryClient = useQueryClient()
 
-  // Counter to force remount when clicking "New Chat" while already on /
-  const [newChatSeq, setNewChatSeq] = useState(0)
-  const prevSessionRef = useRef(session)
-  useEffect(() => {
-    if (!session && prevSessionRef.current !== undefined) {
-      // Navigated from a session to new chat — bump counter
-      setNewChatSeq((n) => n + 1)
-    }
-    prevSessionRef.current = session
-  }, [session])
-
-  const chatKey = session ?? `new-${newChatSeq}`
+  const chatKey = session ?? `new-${search.new ?? 0}`
 
   // Fetch saved messages when resuming a session
   const { data: savedMessages, isLoading: isLoadingSession } = useQuery({

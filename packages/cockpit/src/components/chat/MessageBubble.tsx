@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm'
 import { buildMessageDisplayParts } from '#/lib/tool-call-display'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
 import { ThinkingBlock } from './ThinkingBlock'
+import { ThinkingDots } from './ThinkingDots'
 import { ToolCallGroupCard } from './ToolCallGroupCard'
 
 export function MessageBubble({
@@ -22,6 +23,9 @@ export function MessageBubble({
     )
     .map((part) => part.toolCall)
   let hasRenderedToolCallGroup = false
+  const hasText = displayParts.some((p) => p.type === 'text')
+  const hasToolCalls = toolCalls.length > 0
+  const showDots = isStreaming && !hasText && hasToolCalls
 
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -44,7 +48,6 @@ export function MessageBubble({
               <ToolCallGroupCard
                 key="tool-call-group"
                 toolCalls={toolCalls}
-                forceOpen={isStreaming}
               />
             )
           }
@@ -72,6 +75,11 @@ export function MessageBubble({
 
           return null
         })}
+        {showDots && (
+          <div className="mt-1 -mb-0.5 text-slate-500 dark:text-slate-400">
+            <ThinkingDots />
+          </div>
+        )}
       </div>
     </div>
   )
