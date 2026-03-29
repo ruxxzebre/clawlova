@@ -17,8 +17,8 @@ services:
       OPENCLAW_UID: ${OPENCLAW_UID:-1000}
       OPENCLAW_GID: ${OPENCLAW_GID:-1000}
     volumes:
-      - openclaw-config:/home/node/.openclaw
-      - openclaw-workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-openclaw-workspace}:/home/node/.openclaw/workspace
       - ./scripts:/bootstrap:ro
     entrypoint: ["/bin/sh", "/bootstrap/openclaw-init.sh"]
 
@@ -39,8 +39,8 @@ services:
       OPENCLAW_DEVICE_TOKEN_FILE: /var/lib/cockpit/openclaw-device-token
       OPENCLAW_BOOTSTRAP_WAIT_SECONDS: ${OPENCLAW_BOOTSTRAP_WAIT_SECONDS:-90}
     volumes:
-      - openclaw-config:/home/node/.openclaw
-      - openclaw-workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-openclaw-workspace}:/home/node/.openclaw/workspace
       - cockpit-state:/var/lib/cockpit
       - ./scripts:/bootstrap:ro
     entrypoint: ["/bin/sh", "/bootstrap/local-bootstrap.sh"]
@@ -63,8 +63,8 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
     volumes:
-      - openclaw-config:/home/node/.openclaw
-      - openclaw-workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-openclaw-workspace}:/home/node/.openclaw/workspace
       ## Uncomment the lines below to enable sandbox isolation
       ## (agents.defaults.sandbox). Requires Docker CLI in the image
       ## (build with --build-arg OPENCLAW_INSTALL_DOCKER_CLI=1) or use
@@ -111,7 +111,7 @@ services:
     ports:
       - "${COCKPIT_PORT:-3000}:3000"
     volumes:
-      - openclaw-config:/openclaw-config
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/openclaw-config
       - cockpit-state:/var/lib/cockpit
     environment:
       OPENCLAW_GATEWAY_URL: http://openclaw-gateway:18789
@@ -146,8 +146,8 @@ services:
       CLAUDE_WEB_COOKIE: ${CLAUDE_WEB_COOKIE:-}
       TZ: ${OPENCLAW_TZ:-UTC}
     volumes:
-      - openclaw-config:/home/node/.openclaw
-      - openclaw-workspace:/home/node/.openclaw/workspace
+      - ${OPENCLAW_CONFIG_DIR:-openclaw-config}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR:-openclaw-workspace}:/home/node/.openclaw/workspace
     stdin_open: true
     tty: true
     init: true

@@ -50,112 +50,16 @@ ensure_gateway_token() {
 
 ensure_config() {
   if [ -f "${CONFIG_ROOT}/openclaw.json" ]; then
-    return 0
+    EXISTING_TOKEN="$(node -e "const c=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));process.stdout.write((c.gateway&&c.gateway.auth&&c.gateway.auth.token)||'')" "${CONFIG_ROOT}/openclaw.json")"
+    if [ "${EXISTING_TOKEN}" = "${OPENCLAW_GATEWAY_TOKEN}" ]; then
+      return 0
+    fi
+    log "init: gateway token changed, regenerating config"
   fi
 
   log "init: writing ${CONFIG_ROOT}/openclaw.json"
-  node -e "
-    const fs = require('node:fs');
-    const path = require('node:path');
-    const configRoot = process.argv[1];
-    const workspaceDir = process.argv[2];
-    const gatewayToken = process.argv[3];
-    const gatewayBind = process.argv[4];
-    const gatewayPort = Number(process.argv[5]);
-    const modelProvider = process.argv[6];
-    const modelName = process.argv[7];
-    const modelId = \`\${modelProvider}/\${modelName}\`;
-    const config = {
-      auth: {
-        profiles: {
-          [\`\${modelProvider}:default\`]: {
-            provider: modelProvider,
-            mode: 'api_key',
-          },
-        },
-      },
-      agents: {
-        defaults: {
-          model: { primary: modelId },
-          models: { [modelId]: { alias: 'Default' } },
-          workspace: workspaceDir,
-        },
-      },
-      tools: {
-        profile: 'coding',
-        web: {
-          search: {
-            enabled: true,
-            provider: 'duckduckgo',
-          },
-        },
-      },
-      commands: {
-        native: 'auto',
-        nativeSkills: 'auto',
-        restart: true,
-        ownerDisplay: 'raw',
-      },
-      session: {
-        dmScope: 'per-channel-peer',
-      },
-      hooks: {
-        internal: {
-          enabled: true,
-          entries: {
-            'command-logger': { enabled: true },
-            'session-memory': { enabled: true },
-          },
-        },
-      },
-      gateway: {
-        port: gatewayPort,
-        mode: 'local',
-        bind: gatewayBind,
-        auth: {
-          mode: 'token',
-          token: gatewayToken,
-        },
-        http: {
-          endpoints: {
-            chatCompletions: { enabled: true },
-          },
-        },
-        controlUi: {
-          allowedOrigins: [
-            'http://localhost:18789',
-            'http://127.0.0.1:18789',
-          ],
-        },
-        tailscale: {
-          mode: 'off',
-          resetOnExit: false,
-        },
-        nodes: {
-          denyCommands: [
-            'camera.snap',
-            'camera.clip',
-            'screen.record',
-            'contacts.add',
-            'calendar.add',
-            'reminders.add',
-            'sms.send',
-          ],
-        },
-      },
-      plugins: {
-        entries: {
-          duckduckgo: { enabled: true },
-        },
-      },
-    };
-    fs.mkdirSync(configRoot, { recursive: true });
-    fs.writeFileSync(
-      path.join(configRoot, 'openclaw.json'),
-      JSON.stringify(config, null, 2) + '\n',
-      'utf8',
-    );
-  " "${CONFIG_ROOT}" "${WORKSPACE_DIR}" "${OPENCLAW_GATEWAY_TOKEN}" "${GATEWAY_BIND}" "${GATEWAY_PORT}" "${MODEL_PROVIDER}" "${MODEL_NAME}"
+  SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+  node "${SCRIPT_DIR}/openclaw-write-config.mjs" "${CONFIG_ROOT}" "${WORKSPACE_DIR}" "${OPENCLAW_GATEWAY_TOKEN}" "${GATEWAY_BIND}" "${GATEWAY_PORT}" "${MODEL_PROVIDER}" "${MODEL_NAME}"
 }
 
 ensure_directories

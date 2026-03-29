@@ -83,11 +83,26 @@ ensure_cockpit_identity() {
   node -e "const crypto=require('node:crypto'); const fs=require('node:fs'); const path=require('node:path'); const deviceFile=process.argv[1]; fs.mkdirSync(path.dirname(deviceFile), { recursive: true }); const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519'); const jwk = publicKey.export({ format: 'jwk' }); const publicKeyRaw = Buffer.from(jwk.x, 'base64url'); const identity = { id: crypto.createHash('sha256').update(publicKeyRaw).digest('hex'), publicKey: Buffer.from(publicKeyRaw).toString('base64url'), privateKey: privateKey.export({ format: 'pem', type: 'pkcs8' }).toString() }; fs.writeFileSync(deviceFile, JSON.stringify(identity, null, 2) + '\n', 'utf8');" "${DEVICE_FILE}"
 }
 
+save_paired_gateway_token() {
+  if [ -n "${CURRENT_GW_TOKEN:-}" ]; then
+    printf '%s\n' "${CURRENT_GW_TOKEN}" >"$(dirname "${DEVICE_TOKEN_FILE}")/.paired-gateway-token"
+  fi
+}
+
 pair_cockpit() {
   ensure_cockpit_identity
 
+  # Invalidate device token if gateway token changed since last pairing
+  CURRENT_GW_TOKEN="$(tr -d '\n' <"${BOOTSTRAP_TOKEN_FILE}" 2>/dev/null || true)"
+  PAIRED_GW_TOKEN="$(tr -d '\n' <"$(dirname "${DEVICE_TOKEN_FILE}")/.paired-gateway-token" 2>/dev/null || true)"
+  if [ -n "${CURRENT_GW_TOKEN}" ] && [ "${CURRENT_GW_TOKEN}" != "${PAIRED_GW_TOKEN}" ]; then
+    log "bootstrap: gateway token changed, clearing stale device credentials"
+    rm -f "${DEVICE_TOKEN_FILE}" "${DEVICE_FILE}"
+  fi
+
   if [ -f "${DEVICE_TOKEN_FILE}" ]; then
     log "bootstrap: cockpit device token already exists"
+    save_paired_gateway_token
     return 0
   fi
 
@@ -104,6 +119,7 @@ pair_cockpit() {
 
   if [ -f "${DEVICE_TOKEN_FILE}" ]; then
     log "bootstrap: cockpit device token persisted during initial connect"
+    save_paired_gateway_token
     return 0
   fi
 
@@ -114,6 +130,7 @@ pair_cockpit() {
 
     if [ -f "${DEVICE_TOKEN_FILE}" ]; then
       log "bootstrap: cockpit device paired successfully"
+      save_paired_gateway_token
       return 0
     fi
 
