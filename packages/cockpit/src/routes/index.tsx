@@ -3,6 +3,7 @@ import { useChat } from '@tanstack/ai-react'
 import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useEffect, useRef, useState } from 'react'
 import {
+  ArrowDown,
   Brain,
   CheckCircle2,
   ChevronDown,
@@ -30,13 +31,35 @@ function ChatPage() {
   })
 
   const [input, setInput] = useState('')
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-scroll to bottom when messages change
+  // Track whether the bottom sentinel is visible via IntersectionObserver
   useEffect(() => {
+    const sentinel = messagesEndRef.current
+    const container = scrollContainerRef.current
+    if (!sentinel || !container) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsAtBottom(entry.isIntersecting),
+      { root: container, threshold: 0 },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [])
+
+  // Auto-scroll to bottom when messages change, only if already at bottom
+  useEffect(() => {
+    if (isAtBottom) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [messages, isAtBottom])
+
+  function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    setIsAtBottom(true)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -56,7 +79,7 @@ function ChatPage() {
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto px-4 py-6">
+      <div className="relative flex-1 overflow-y-auto px-4 py-6" ref={scrollContainerRef}>
         <div className="mx-auto max-w-3xl space-y-4">
           {messages.length === 0 && (
             <div className="flex h-full items-center justify-center py-20 text-center">
@@ -95,6 +118,18 @@ function ChatPage() {
 
           <div ref={messagesEndRef} />
         </div>
+
+        {/* Scroll to bottom button */}
+        {!isAtBottom && (
+          <button
+            type="button"
+            onClick={scrollToBottom}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-lg backdrop-blur-sm transition hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl"
+          >
+            <ArrowDown className="h-3.5 w-3.5" />
+            Scroll to bottom
+          </button>
+        )}
       </div>
 
       {/* Input area */}
@@ -194,7 +229,7 @@ function MessageBubble({
                 key={i}
                 className="prose prose-sm dark:prose-invert max-w-none leading-snug [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:my-1 [&_li]:my-0"
               >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ hr: () => null }}>
                   {part.content}
                 </ReactMarkdown>
               </div>
