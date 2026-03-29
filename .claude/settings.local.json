@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"thinking\\\\|contentBlock\\\\|thinkingBlock\" /c/Users/rootneck/Documents/GitHub/clawlova --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
+      "Bash(grep -r \"expand\\\\|collapse\\\\|accordion\\\\|collapsible\" /c/Users/rootneck/Documents/GitHub/clawlova/packages/cockpit --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)",
+      "Bash(grep -r \"MessagePart\\\\|contentBlock\\\\|thinkingBlock\" /c/Users/rootneck/Documents/GitHub/clawlova --include=*.ts --include=*.tsx)",
+      "Bash(find /c/Users/rootneck/Documents/GitHub/clawlova/node_modules/@tanstack/ai -name *.d.ts)",
+      "Bash(find /c/Users/rootneck/Documents/GitHub/clawlova -name tailwind.config.* -o -name shadcn.json)",
+      "Bash(xargs cat:*)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -r rehype C:UsersrootneckDocumentsGitHubclawlovapackagescockpit --include=*.ts --include=*.tsx --include=*.js --include=*.jsx)"
+    ]
+  }
+}

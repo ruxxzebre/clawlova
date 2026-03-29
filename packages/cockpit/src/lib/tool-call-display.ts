@@ -27,6 +27,7 @@ export interface ToolCallViewModel {
 
 export type MessageDisplayPart =
   | { type: 'text'; content: string }
+  | { type: 'thinking'; content: string }
   | { type: 'tool-call'; toolCall: ToolCallViewModel }
 
 export function buildMessageDisplayParts(
@@ -48,6 +49,13 @@ export function buildMessageDisplayParts(
       accumulatedText = part.content
       if (content) {
         displayParts.push({ type: 'text', content })
+      }
+      continue
+    }
+
+    if (part.type === 'thinking') {
+      if (part.content) {
+        displayParts.push({ type: 'thinking', content: part.content })
       }
       continue
     }
