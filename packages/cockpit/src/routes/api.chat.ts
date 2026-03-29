@@ -10,7 +10,9 @@ export const Route = createFileRoute('/api/chat')({
           return new Response(null, { status: 499 })
         }
 
-        const { messages } = await request.json()
+        const body = await request.json()
+        const messages = body.messages
+        const sessionKey: string | undefined = body.data?.sessionKey
 
         const abortController = new AbortController()
         request.signal.addEventListener('abort', () => abortController.abort(), {
@@ -19,6 +21,7 @@ export const Route = createFileRoute('/api/chat')({
 
         const stream = createOpenClawSessionStream({
           messages,
+          sessionKey,
           abortSignal: abortController.signal,
         })
 

@@ -47,7 +47,7 @@ interface ConfigData {
   auth?: { profiles?: Record<string, AuthProfile> }
   agents?: {
     defaults?: {
-      model?: { primary?: string; [k: string]: any }
+      model?: { primary?: string;[k: string]: any }
       models?: Record<string, { alias?: string }>
       workspace?: string
       [k: string]: any
@@ -190,6 +190,7 @@ function ConfigPage() {
       <div className="mb-6 flex items-center gap-3">
         <Link
           to="/"
+          search={{}}
           className="rounded-lg p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
         >
           <ArrowLeft className="h-4 w-4" />

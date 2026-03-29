@@ -24,26 +24,38 @@ const PROVIDERS: Record<string, ProviderConfig> = {
       'anthropic-version': '2023-06-01',
     }),
     extractModels: (data) =>
-      (data?.data ?? [])
-        .map((m: any) => m.id as string)
-        .sort(),
+      (data?.data ?? []).map((m: any) => m.id as string).sort(),
   },
 }
 
 // Fallback models when no API key is available or fetch fails
 const FALLBACK_MODELS: Record<string, string[]> = {
   openai: [
-    'gpt-5.4', 'gpt-5.2', 'gpt-5.1-codex',
-    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'gpt-4o', 'gpt-4o-mini',
-    'o3', 'o3-mini', 'o4-mini',
+    'gpt-5.4',
+    'gpt-5.2',
+    'gpt-5.1-codex',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4.1-nano',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'o3',
+    'o3-mini',
+    'o4-mini',
   ],
   anthropic: [
-    'claude-opus-4-6', 'claude-sonnet-4-6',
-    'claude-sonnet-4-5-20250514', 'claude-haiku-4-5-20251001',
+    'claude-opus-4-6',
+    'claude-sonnet-4-6',
+    'claude-sonnet-4-5-20250514',
+    'claude-haiku-4-5-20251001',
     'claude-3-5-sonnet-20241022',
   ],
-  google: ['gemini-3-pro-preview', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-2.5-flash'],
+  google: [
+    'gemini-3-pro-preview',
+    'gemini-3-flash-preview',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+  ],
   openrouter: ['auto'],
   ollama: ['llama3.3', 'llama3.1', 'codellama', 'mistral', 'deepseek-coder-v2'],
 }
@@ -66,7 +78,10 @@ export const Route = createFileRoute('/api/models')({
         if (!providerConfig) {
           // No live fetch for this provider — return fallbacks
           return new Response(
-            JSON.stringify({ models: FALLBACK_MODELS[provider] ?? [], source: 'fallback' }),
+            JSON.stringify({
+              models: FALLBACK_MODELS[provider] ?? [],
+              source: 'fallback',
+            }),
             { headers: { 'Content-Type': 'application/json' } },
           )
         }
@@ -81,17 +96,21 @@ export const Route = createFileRoute('/api/models')({
 
         // Also check env vars as fallback
         if (!apiKey || apiKey === '••••••••') {
-          const envKey = provider === 'openai'
-            ? process.env['OPENAI_API_KEY']
-            : provider === 'anthropic'
-              ? process.env['ANTHROPIC_API_KEY']
-              : undefined
+          const envKey =
+            provider === 'openai'
+              ? process.env['OPENAI_API_KEY']
+              : provider === 'anthropic'
+                ? process.env['ANTHROPIC_API_KEY']
+                : undefined
           apiKey = envKey ?? apiKey
         }
 
         if (!apiKey || apiKey === '••••••••') {
           return new Response(
-            JSON.stringify({ models: FALLBACK_MODELS[provider] ?? [], source: 'fallback' }),
+            JSON.stringify({
+              models: FALLBACK_MODELS[provider] ?? [],
+              source: 'fallback',
+            }),
             { headers: { 'Content-Type': 'application/json' } },
           )
         }
@@ -104,7 +123,10 @@ export const Route = createFileRoute('/api/models')({
 
           if (!res.ok) {
             return new Response(
-              JSON.stringify({ models: FALLBACK_MODELS[provider] ?? [], source: 'fallback' }),
+              JSON.stringify({
+                models: FALLBACK_MODELS[provider] ?? [],
+                source: 'fallback',
+              }),
               { headers: { 'Content-Type': 'application/json' } },
             )
           }
@@ -112,13 +134,15 @@ export const Route = createFileRoute('/api/models')({
           const data = await res.json()
           const models = providerConfig.extractModels(data)
 
-          return new Response(
-            JSON.stringify({ models, source: 'live' }),
-            { headers: { 'Content-Type': 'application/json' } },
-          )
+          return new Response(JSON.stringify({ models, source: 'live' }), {
+            headers: { 'Content-Type': 'application/json' },
+          })
         } catch {
           return new Response(
-            JSON.stringify({ models: FALLBACK_MODELS[provider] ?? [], source: 'fallback' }),
+            JSON.stringify({
+              models: FALLBACK_MODELS[provider] ?? [],
+              source: 'fallback',
+            }),
             { headers: { 'Content-Type': 'application/json' } },
           )
         }

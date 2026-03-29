@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useChat } from '@tanstack/ai-react'
 import { fetchServerSentEvents } from '@tanstack/ai-client'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import {
   ArrowDown,
@@ -23,11 +24,88 @@ import type { ToolCallViewModel } from '#/lib/tool-call-display'
 
 export const Route = createFileRoute('/')({
   component: ChatPage,
+  validateSearch: (search: Record<string, unknown>): { session?: string } => ({
+    session: (search.session as string) || undefined,
+  }),
 })
 
+// ---------------------------------------------------------------------------
+// Outer component: handles routing, data fetching, and keyed remounting
+// ---------------------------------------------------------------------------
+
 function ChatPage() {
+  const { session } = Route.useSearch()
+  const queryClient = useQueryClient()
+
+  // Counter to force remount when clicking "New Chat" while already on /
+  const [newChatSeq, setNewChatSeq] = useState(0)
+  const prevSessionRef = useRef(session)
+  useEffect(() => {
+    if (!session && prevSessionRef.current !== undefined) {
+      // Navigated from a session to new chat — bump counter
+      setNewChatSeq((n) => n + 1)
+    }
+    prevSessionRef.current = session
+  }, [session])
+
+  const chatKey = session ?? `new-${newChatSeq}`
+
+  // Fetch saved messages when resuming a session
+  const { data: savedMessages, isLoading: isLoadingSession } = useQuery({
+    queryKey: ['session', session],
+    queryFn: () =>
+      fetch(`/api/session?key=${encodeURIComponent(session!)}`)
+        .then((r) => r.json())
+        .then((msgs: Array<UIMessage & { createdAt?: string }>) =>
+          msgs.map((m) => ({
+            ...m,
+            createdAt: m.createdAt ? new Date(m.createdAt) : undefined,
+          })),
+        ),
+    enabled: !!session,
+  })
+
+  // Wait for messages to load before mounting ChatView
+  if (session && isLoadingSession) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <div className="text-sm text-slate-500 dark:text-slate-400">
+          Loading conversation…
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <ChatView
+      key={chatKey}
+      sessionKey={session}
+      initialMessages={session ? (savedMessages as UIMessage[]) : undefined}
+      onChatFinish={() =>
+        queryClient.invalidateQueries({ queryKey: ['sessions'] })
+      }
+    />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Inner component: owns useChat, fully remounts on chat switch via key prop
+// ---------------------------------------------------------------------------
+
+function ChatView({
+  sessionKey,
+  initialMessages,
+  onChatFinish,
+}: {
+  sessionKey?: string
+  initialMessages?: UIMessage[]
+  onChatFinish: () => void
+}) {
   const { messages, sendMessage, isLoading, error } = useChat({
     connection: fetchServerSentEvents('/api/chat'),
+    initialMessages,
+    body: sessionKey ? { sessionKey } : undefined,
+    onFinish: onChatFinish,
   })
 
   const [input, setInput] = useState('')
@@ -77,7 +155,7 @@ function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
+    <div className="flex flex-1 flex-col overflow-hidden">
       {/* Message list */}
       <div className="relative flex-1 overflow-y-auto px-4 py-6" ref={scrollContainerRef}>
         <div className="mx-auto max-w-3xl space-y-4">
@@ -124,7 +202,7 @@ function ChatPage() {
           <button
             type="button"
             onClick={scrollToBottom}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-lg backdrop-blur-sm transition hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl"
+            className="sticky bottom-4 mx-auto flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-lg backdrop-blur-sm transition hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl"
           >
             <ArrowDown className="h-3.5 w-3.5" />
             Scroll to bottom
