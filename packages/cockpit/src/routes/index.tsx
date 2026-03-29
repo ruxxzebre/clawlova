@@ -3,7 +3,7 @@ import { useChat } from '@tanstack/ai-react'
 import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, Send } from 'lucide-react'
+import { ArrowDown, Send, Square } from 'lucide-react'
 import type { UIMessage } from '@tanstack/ai'
 import { MessageBubble } from '#/components/chat/MessageBubble'
 import { ThinkingDots } from '#/components/chat/ThinkingDots'
@@ -80,7 +80,7 @@ function ChatView({
   initialMessages?: UIMessage[]
   onChatFinish: () => void
 }) {
-  const { messages, sendMessage, isLoading, error } = useChat({
+  const { messages, sendMessage, isLoading, error, stop } = useChat({
     connection: fetchServerSentEvents('/api/chat'),
     initialMessages,
     body: sessionKey ? { sessionKey } : undefined,
@@ -192,11 +192,6 @@ function ChatView({
       {/* Input area */}
       <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
         <div className="mx-auto max-w-3xl">
-          {isLoading && (
-            <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-200">
-              Waiting for response. Input is disabled until the current reply finishes.
-            </div>
-          )}
           <form onSubmit={handleSubmit} className="flex gap-3">
             <textarea
               ref={inputRef}
@@ -211,17 +206,27 @@ function ChatView({
               disabled={isLoading}
               aria-disabled={isLoading}
               rows={1}
-              className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-slate-400 dark:focus:border-slate-500 disabled:cursor-not-allowed disabled:border-amber-500/40 disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800/80 dark:disabled:text-slate-400"
+              className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-slate-400 dark:focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800/80 dark:disabled:text-slate-400 disabled:opacity-60"
               style={{ maxHeight: '10rem', overflowY: 'auto' }}
             />
-            <button
-              type="submit"
-              disabled={!input.trim() || isLoading}
-              aria-disabled={!input.trim() || isLoading}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 transition hover:opacity-80 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
-            >
-              <Send className="h-4 w-4" />
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={stop}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition hover:bg-red-700"
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!input.trim()}
+                aria-disabled={!input.trim()}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 transition hover:opacity-80 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            )}
           </form>
         </div>
       </div>
