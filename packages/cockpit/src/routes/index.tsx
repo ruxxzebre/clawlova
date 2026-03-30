@@ -4,7 +4,8 @@ import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { loadSession } from '#/server/functions'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowDown, Check, Code, Lightbulb, MessageCircle, RefreshCw, Send, Square, Wrench } from 'lucide-react'
+import { ArrowDown, Check, Code, Lightbulb, MessageCircle, Paperclip, RefreshCw, Send, Square, Wrench, X } from 'lucide-react'
+import { requestUpload, confirmUpload } from '#/server/functions'
 import { useChatUIStore } from '#/lib/chat-store'
 import { motion, AnimatePresence } from 'motion/react'
 import type { UIMessage } from '@tanstack/ai'
@@ -90,7 +91,6 @@ function ChatView({
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     connection: fetchServerSentEvents('/api/chat'),
     initialMessages,
-    body: sessionKey ? { sessionKey } : undefined,
     onFinish: onChatFinish,
   })
 
@@ -100,9 +100,14 @@ function ChatView({
   const [input, setInput] = useState('')
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [lastInput, setLastInput] = useState('')
+  const [pendingFiles, setPendingFiles] = useState<
+    { key: string; originalName: string; contentType: string; sizeBytes: number; previewUrl?: string }[]
+  >([])
+  const [isUploading, setIsUploading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const resizeTextarea = useCallback(() => {
     const el = inputRef.current
@@ -110,6 +115,60 @@ function ChatView({
     el.style.height = 'auto'
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }, [])
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    setIsUploading(true)
+    try {
+      for (const file of Array.from(files)) {
+        const { uploadUrl, key } = await requestUpload({
+          data: {
+            filename: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+          },
+        })
+
+        await fetch(uploadUrl, {
+          method: 'PUT',
+          body: file,
+          headers: { 'Content-Type': file.type },
+        })
+
+        await confirmUpload({
+          data: {
+            key,
+            originalName: file.name,
+            contentType: file.type,
+            sizeBytes: file.size,
+          },
+        })
+
+        const previewUrl = file.type.startsWith('image/')
+          ? URL.createObjectURL(file)
+          : undefined
+
+        setPendingFiles((prev) => [
+          ...prev,
+          { key, originalName: file.name, contentType: file.type, sizeBytes: file.size, previewUrl },
+        ])
+      }
+    } catch (err) {
+      console.error('Upload failed:', err)
+    } finally {
+      setIsUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function removePendingFile(key: string) {
+    setPendingFiles((prev) => {
+      const removed = prev.find((f) => f.key === key)
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((f) => f.key !== key)
+    })
+  }
 
   useEffect(() => {
     const sentinel = messagesEndRef.current
@@ -168,16 +227,25 @@ function ChatView({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || isLoading) return
+    if ((!text && pendingFiles.length === 0) || isLoading) return
     setLastInput(text)
     setInput('')
+    const attachments = pendingFiles.map(({ key, originalName, contentType, sizeBytes }) => ({
+      key,
+      originalName,
+      contentType,
+      sizeBytes,
+    }))
+    setPendingFiles([])
     if (inputRef.current) inputRef.current.style.height = 'auto'
-    await sendMessage(text)
+    await sendMessage(text || 'See attached file(s)', {
+      body: { sessionKey, attachments },
+    })
   }
 
   async function handleRetry() {
     if (!lastInput || isLoading) return
-    await sendMessage(lastInput)
+    await sendMessage(lastInput, { body: { sessionKey } })
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -333,47 +401,98 @@ function ChatView({
       {/* Input area */}
       <div className="border-t border-sand-200 dark:border-sand-800 bg-sand-50 dark:bg-sand-950 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3">
         <div className="mx-auto max-w-3xl">
-          <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value)
-                resizeTextarea()
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isLoading
-                  ? 'OpenClaw is responding...'
-                  : 'Message OpenClaw…'
-              }
-              disabled={isLoading}
-              aria-disabled={isLoading}
-              rows={1}
-              className="flex-1 resize-none rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-3 py-2.5 sm:px-4 text-sm sm:text-base text-sand-800 dark:text-sand-100 placeholder:text-sand-400 outline-none focus:border-terra-400 dark:focus:border-terra-500 focus:ring-1 focus:ring-terra-400/30 disabled:cursor-not-allowed disabled:bg-sand-200 disabled:text-sand-500 dark:disabled:bg-sand-800/80 dark:disabled:text-sand-400 disabled:opacity-60"
-            />
-            {isLoading ? (
-              <motion.button
-                type="button"
-                onClick={stop}
-                title="Stop generating (Esc)"
-                whileTap={{ scale: 0.92 }}
-                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition-colors hover:bg-red-700"
-              >
-                <Square className="h-3.5 w-3.5 fill-current" />
-              </motion.button>
-            ) : (
-              <motion.button
-                type="submit"
-                disabled={!input.trim()}
-                aria-disabled={!input.trim()}
-                title="Send message (Enter)"
-                whileTap={{ scale: 0.92 }}
-                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-terra-500 text-white transition-colors hover:bg-terra-600 disabled:cursor-not-allowed disabled:bg-sand-300 disabled:text-sand-500 dark:disabled:bg-sand-700 dark:disabled:text-sand-400"
-              >
-                <Send className="h-4 w-4" />
-              </motion.button>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+            {/* Pending file previews */}
+            {pendingFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {pendingFiles.map((file) => (
+                  <div
+                    key={file.key}
+                    className="flex items-center gap-2 rounded-lg border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-2.5 py-1.5 text-xs text-sand-600 dark:text-sand-300"
+                  >
+                    {file.previewUrl ? (
+                      <img
+                        src={file.previewUrl}
+                        alt={file.originalName}
+                        className="h-8 w-8 rounded object-cover"
+                      />
+                    ) : null}
+                    <span className="max-w-[120px] truncate">
+                      {file.originalName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removePendingFile(file.key)}
+                      className="text-sand-400 hover:text-sand-600 dark:hover:text-sand-200"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
             )}
+
+            <div className="flex gap-2 sm:gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,text/markdown,application/json,application/xml"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isLoading || isUploading}
+                title="Attach file"
+                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 text-sand-500 dark:text-sand-400 transition-colors hover:bg-sand-200 dark:hover:bg-sand-700 hover:text-sand-700 dark:hover:text-sand-200 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  resizeTextarea()
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  isUploading
+                    ? 'Uploading file...'
+                    : isLoading
+                      ? 'OpenClaw is responding...'
+                      : 'Message OpenClaw\u2026'
+                }
+                disabled={isLoading || isUploading}
+                aria-disabled={isLoading || isUploading}
+                rows={1}
+                className="flex-1 resize-none rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-3 py-2.5 sm:px-4 text-sm sm:text-base text-sand-800 dark:text-sand-100 placeholder:text-sand-400 outline-none focus:border-terra-400 dark:focus:border-terra-500 focus:ring-1 focus:ring-terra-400/30 disabled:cursor-not-allowed disabled:bg-sand-200 disabled:text-sand-500 dark:disabled:bg-sand-800/80 dark:disabled:text-sand-400 disabled:opacity-60"
+              />
+              {isLoading ? (
+                <motion.button
+                  type="button"
+                  onClick={stop}
+                  title="Stop generating (Esc)"
+                  whileTap={{ scale: 0.92 }}
+                  className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition-colors hover:bg-red-700"
+                >
+                  <Square className="h-3.5 w-3.5 fill-current" />
+                </motion.button>
+              ) : (
+                <motion.button
+                  type="submit"
+                  disabled={!input.trim() && pendingFiles.length === 0}
+                  aria-disabled={!input.trim() && pendingFiles.length === 0}
+                  title="Send message (Enter)"
+                  whileTap={{ scale: 0.92 }}
+                  className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-terra-500 text-white transition-colors hover:bg-terra-600 disabled:cursor-not-allowed disabled:bg-sand-300 disabled:text-sand-500 dark:disabled:bg-sand-700 dark:disabled:text-sand-400"
+                >
+                  <Send className="h-4 w-4" />
+                </motion.button>
+              )}
+            </div>
           </form>
         </div>
       </div>
