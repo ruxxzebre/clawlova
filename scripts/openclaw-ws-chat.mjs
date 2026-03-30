@@ -477,7 +477,7 @@ function throwGatewayError(method, error) {
 
 function printUsage() {
   console.error(`Usage:
-  npm run openclaw:ws -- "your prompt here"
+  pnpm openclaw:ws -- "your prompt here"
 
 Options:
   --url <ws-or-http-url>      Gateway URL, default: ${DEFAULT_GATEWAY_HTTP_URL}

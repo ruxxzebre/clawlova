@@ -1,6 +1,6 @@
 export class AsyncQueue<T> {
-  private items: Array<T> = []
-  private resolvers: Array<(item: IteratorResult<T>) => void> = []
+  private items: T[] = []
+  private resolvers: ((item: IteratorResult<T>) => void)[] = []
   private closed = false
 
   push(item: T): void {

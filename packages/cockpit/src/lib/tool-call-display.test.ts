@@ -23,7 +23,7 @@ describe('buildMessageDisplayParts', () => {
         state: 'complete',
       },
       { type: 'text', content: 'After tool' },
-    ] satisfies Array<MessagePart>
+    ] satisfies MessagePart[]
 
     const displayParts = buildMessageDisplayParts(parts)
 
@@ -59,7 +59,7 @@ describe('buildMessageDisplayParts', () => {
         state: 'error',
         error: 'ENOENT',
       },
-    ] satisfies Array<MessagePart>
+    ] satisfies MessagePart[]
 
     const displayParts = buildMessageDisplayParts(parts)
     const toolPart = displayParts[0]
@@ -91,7 +91,7 @@ describe('buildMessageDisplayParts', () => {
         state: 'complete',
       },
       { type: 'text', content: 'Hello there.Now continuing.' },
-    ] satisfies Array<MessagePart>
+    ] satisfies MessagePart[]
 
     const displayParts = buildMessageDisplayParts(parts)
 
@@ -112,7 +112,7 @@ describe('buildMessageDisplayParts', () => {
         arguments: '{"cmd":"ls"',
         state: 'input-streaming',
       },
-    ] satisfies Array<MessagePart>
+    ] satisfies MessagePart[]
 
     const displayParts = buildMessageDisplayParts(parts)
     const toolPart = displayParts[0]

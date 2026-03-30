@@ -36,7 +36,7 @@ class MockWebSocket {
   }
 
   private listeners = new Map<string, Set<(event: any) => void>>()
-  sentFrames: Array<Record<string, unknown>> = []
+  sentFrames: Record<string, unknown>[] = []
 
   constructor(public readonly url: string) {
     MockWebSocket.instances.push(this)
@@ -129,7 +129,7 @@ class MockWebSocket {
   }
 }
 
-async function collectStreamChunks(messages: Array<UIMessage>) {
+async function collectStreamChunks(messages: UIMessage[]) {
   const chunks = []
   for await (const chunk of createOpenClawSessionStream({ messages })) {
     chunks.push(chunk)
@@ -177,7 +177,7 @@ describe('extractLatestUserMessageText', () => {
         role: 'user',
         parts: [{ type: 'text', content: 'latest prompt' }],
       },
-    ] as Array<UIMessage>
+    ] as UIMessage[]
 
     expect(extractLatestUserMessageText(messages)).toBe('latest prompt')
   })
@@ -187,7 +187,7 @@ describe('deriveSessionKey', () => {
   it('stays stable for the same conversation seed', () => {
     const messages = [
       { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-    ] as Array<UIMessage>
+    ] as UIMessage[]
 
     expect(deriveSessionKey(messages)).toBe('agent:main:chat-user-1')
   })
@@ -381,7 +381,7 @@ describe('createOpenClawSessionStream auth flow', () => {
 
       const chunks = await collectStreamChunks([
         { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as Array<UIMessage>)
+      ] as UIMessage[])
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',
@@ -411,7 +411,7 @@ describe('createOpenClawSessionStream auth flow', () => {
 
       await collectStreamChunks([
         { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as Array<UIMessage>)
+      ] as UIMessage[])
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',
@@ -445,7 +445,7 @@ describe('createOpenClawSessionStream auth flow', () => {
 
       const chunks = await collectStreamChunks([
         { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as Array<UIMessage>)
+      ] as UIMessage[])
 
       expect(chunks).toHaveLength(1)
       expect(chunks[0]).toMatchObject({
@@ -473,7 +473,7 @@ describe('createOpenClawSessionStream auth flow', () => {
 
       const chunks = await collectStreamChunks([
         { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as Array<UIMessage>)
+      ] as UIMessage[])
 
       expect(chunks).toHaveLength(1)
       expect(chunks[0]).toMatchObject({
@@ -506,7 +506,7 @@ describe('createOpenClawSessionStream auth flow', () => {
 
       await collectStreamChunks([
         { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as Array<UIMessage>)
+      ] as UIMessage[])
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',

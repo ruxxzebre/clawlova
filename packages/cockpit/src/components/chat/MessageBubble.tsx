@@ -27,9 +27,10 @@ export function MessageBubble({
         part.type === 'tool-call',
     )
     .map((part) => part.toolCall)
+
   let hasRenderedToolCallGroup = false
   const hasToolCalls = toolCalls.length > 0
-  const lastPartType = displayParts.length > 0 ? displayParts[displayParts.length - 1]!.type : null
+  const lastPartType = displayParts.length > 0 ? displayParts[displayParts.length - 1].type : null
   const showDots = isStreaming && hasToolCalls && lastPartType !== 'text'
 
   const fullText = displayParts

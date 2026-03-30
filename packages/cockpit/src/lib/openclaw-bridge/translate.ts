@@ -10,7 +10,7 @@ export function translateGatewayEvent(
   >,
 ): TranslationResult {
   const timestamp = Date.now()
-  const chunks: Array<StreamChunk> = []
+  const chunks: StreamChunk[] = []
   const stream = asString(payload['stream'])
   const lifecycle = asString(payload['lifecycle'])
   const data = asRecord(payload['data'])
@@ -166,7 +166,7 @@ export function translateGatewayEvent(
 }
 
 export function extractLatestUserMessageText(
-  messages: Array<UIMessage | null>,
+  messages: (UIMessage | null)[],
 ): string | null {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const message = messages[index]
@@ -196,7 +196,7 @@ export function extractLatestUserMessageText(
   return null
 }
 
-export function deriveSessionKey(messages: Array<UIMessage>): string {
+export function deriveSessionKey(messages: UIMessage[]): string {
   const seed = messages.find((message) => message.role === 'user')?.id ?? crypto.randomUUID()
   return `agent:main:chat-${seed}`
 }

@@ -7,7 +7,7 @@ import { ToolCallCard } from './ToolCallCard'
 export function ToolCallGroupCard({
   toolCalls,
 }: {
-  toolCalls: Array<ToolCallViewModel>
+  toolCalls: ToolCallViewModel[]
 }) {
   const [isOpen, setIsOpen] = useState(false)
 

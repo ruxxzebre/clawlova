@@ -31,9 +31,9 @@ export type MessageDisplayPart =
   | { type: 'tool-call'; toolCall: ToolCallViewModel }
 
 export function buildMessageDisplayParts(
-  parts: Array<MessagePart>,
-): Array<MessageDisplayPart> {
-  const displayParts: Array<MessageDisplayPart> = []
+  parts: MessagePart[],
+): MessageDisplayPart[] {
+  const displayParts: MessageDisplayPart[] = []
   const toolCalls = new Map<string, ToolCallViewModel>()
   let accumulatedText = ''
 
@@ -86,7 +86,7 @@ export function formatDisplayValue(value: unknown): string {
 }
 
 function upsertToolCall(
-  displayParts: Array<MessageDisplayPart>,
+  displayParts: MessageDisplayPart[],
   toolCalls: Map<string, ToolCallViewModel>,
   part: ToolCallPart,
 ): void {
@@ -118,7 +118,7 @@ function upsertToolCall(
 }
 
 function attachToolResult(
-  displayParts: Array<MessageDisplayPart>,
+  displayParts: MessageDisplayPart[],
   toolCalls: Map<string, ToolCallViewModel>,
   part: ToolResultPart,
 ): void {

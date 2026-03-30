@@ -1,11 +1,8 @@
 {
     "name": "clawlova",
     "version": "0.0.1",
-    "workspaces": [
-        "packages/*"
-    ],
     "scripts": {
-        "dev": "npm run dev --workspace=cockpit",
+        "dev": "pnpm --filter cockpit dev",
         "openclaw:ws": "node scripts/openclaw-ws-chat.mjs"
     }
 }

@@ -82,7 +82,7 @@ export function signChallenge(options: {
   clientId: string
   clientMode: string
   role: string
-  scopes: Array<string>
+  scopes: string[]
   token: string
 }): Record<string, unknown> {
   const payload = [

@@ -25,14 +25,14 @@ interface SessionIndexEntry {
 
 interface JsonlMessage {
   role: string
-  content?: Array<{
+  content?: {
     type: string
     text?: string
     id?: string
     name?: string
     arguments?: unknown
     partialJson?: string
-  }>
+  }[]
   toolCallId?: string
   toolName?: string
   isError?: boolean

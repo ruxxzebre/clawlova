@@ -1,7 +1,7 @@
 import type { StreamChunk, UIMessage } from '@tanstack/ai'
 
 export interface SessionBridgeOptions {
-  messages: Array<UIMessage>
+  messages: UIMessage[]
   abortSignal?: AbortSignal
   sessionKey?: string
 }
@@ -69,7 +69,7 @@ export interface GatewayEventFrame {
 export type GatewayFrame = GatewayResponseFrame | GatewayEventFrame
 
 export interface TranslationResult {
-  chunks: Array<StreamChunk>
+  chunks: StreamChunk[]
   finishReason?: 'stop' | 'length' | 'content_filter' | 'tool_calls' | null
   done?: boolean
 }
