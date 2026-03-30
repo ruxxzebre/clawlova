@@ -59,3 +59,24 @@ body {
   & > :first-child { margin-top: 0; }
   & > :last-child { margin-bottom: 0; }
 }
+
+/* Streaming cursor — blinking caret appended to the last rendered element
+   while text is actively being revealed. Uses ::after on the last child so
+   it sits inline at the end of the sentence, not on its own line. */
+.prose-chat.is-streaming > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 1.1em;
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  background-color: currentColor;
+  opacity: 0.6;
+  border-radius: 1px;
+  animation: cursor-blink 1s steps(2, start) infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 0; }
+}

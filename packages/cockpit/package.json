@@ -40,7 +40,8 @@
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18",
-    "zod": "^4.3.6"
+    "zod": "^4.3.6",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tanstack/devtools-event-client": "latest",

@@ -4,7 +4,8 @@ import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { loadSession } from '#/server/functions'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowDown, Code, Lightbulb, MessageCircle, RefreshCw, Send, Square, Wrench } from 'lucide-react'
+import { ArrowDown, Check, Code, Lightbulb, MessageCircle, RefreshCw, Send, Square, Wrench } from 'lucide-react'
+import { useChatUIStore } from '#/lib/chat-store'
 import { motion, AnimatePresence } from 'motion/react'
 import type { UIMessage } from '@tanstack/ai'
 import { MessageBubble } from '#/components/chat/MessageBubble'
@@ -93,6 +94,9 @@ function ChatView({
     onFinish: onChatFinish,
   })
 
+  const autoScroll = useChatUIStore((s) => s.autoScroll)
+  const toggleAutoScroll = useChatUIStore((s) => s.toggleAutoScroll)
+
   const [input, setInput] = useState('')
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [lastInput, setLastInput] = useState('')
@@ -120,14 +124,15 @@ function ChatView({
   }, [])
 
   useEffect(() => {
-    if (isAtBottom) {
-      // During streaming, scroll instantly to avoid competing smooth-scroll animations
-      // that cause a hitchy feel. Only use smooth scroll for completed messages.
+    // During streaming: scroll only when auto-scroll is enabled (regardless of position)
+    // After streaming: scroll only if already at bottom
+    const shouldScroll = isLoading ? autoScroll : isAtBottom
+    if (shouldScroll) {
       messagesEndRef.current?.scrollIntoView({
         behavior: isLoading ? 'instant' : 'smooth',
       })
     }
-  }, [messages, isAtBottom, isLoading])
+  }, [messages, isAtBottom, isLoading, autoScroll])
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -234,25 +239,31 @@ function ChatView({
             )}
           </AnimatePresence>
 
-          {messages.map((message, index) => (
-            <MessageBubble
-              key={message.id}
-              message={message}
-              isStreaming={isLoading && index === messages.length - 1}
-            />
-          ))}
+          <AnimatePresence initial={false}>
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isStreaming={isLoading && index === messages.length - 1}
+              />
+            ))}
+          </AnimatePresence>
 
-          {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-            <motion.div
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex justify-start"
-            >
-              <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sand-500 dark:text-sand-400">
-                <ThinkingDots />
-              </div>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+              <motion.div
+                key="thinking-indicator"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
+                className="flex justify-start"
+              >
+                <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sand-500 dark:text-sand-400">
+                  <ThinkingDots />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {error && (
@@ -283,21 +294,38 @@ function ChatView({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom / auto-scroll split button */}
         <AnimatePresence>
           {!isAtBottom && (
-            <motion.button
-              type="button"
-              onClick={scrollToBottom}
+            <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.2 }}
-              className="sticky bottom-4 mx-auto flex items-center gap-1.5 rounded-full border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 px-3 py-1.5 text-xs font-medium text-sand-600 dark:text-sand-300 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
+              className="sticky bottom-4 mx-auto flex w-fit items-center gap-[3px]"
             >
-              <ArrowDown className="h-3.5 w-3.5" />
-              Scroll to bottom
-            </motion.button>
+              {/* Left side – scroll to bottom (80%) */}
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="flex items-center gap-1.5 rounded-l-full rounded-r-sm border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 pl-3 pr-3 py-1.5 text-xs font-medium text-sand-600 dark:text-sand-300 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
+              >
+                <ArrowDown className="h-3.5 w-3.5" />
+                Scroll to bottom
+              </button>
+
+              {/* Right side – auto-scroll toggle (20%) */}
+              <button
+                type="button"
+                onClick={toggleAutoScroll}
+                title={autoScroll ? 'Auto-scroll on – click to disable' : 'Auto-scroll off – click to enable'}
+                className="flex items-center justify-center rounded-l-sm rounded-r-[10px] border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 px-2 py-1.5 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
+              >
+                <div className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border transition-colors ${autoScroll ? 'border-terra-500 bg-terra-500' : 'border-sand-400 dark:border-sand-500'}`}>
+                  {autoScroll && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
+                </div>
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>

@@ -119,11 +119,35 @@ services:
       OPENCLAW_BOOTSTRAP_TOKEN_FILE: /openclaw-config/.gateway-token
       OPENCLAW_DEVICE_FILE: /var/lib/cockpit/openclaw-device.json
       OPENCLAW_DEVICE_TOKEN_FILE: /var/lib/cockpit/openclaw-device-token
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-openclaw-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
     depends_on:
       openclaw-gateway:
         condition: service_healthy
       cockpit-bootstrap:
         condition: service_completed_successfully
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-openclaw-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     restart: unless-stopped
 
   openclaw-cli:
@@ -159,3 +183,4 @@ volumes:
   openclaw-config:
   openclaw-workspace:
   cockpit-state:
+  minio-data:
