@@ -7,6 +7,7 @@ import { getBridgeConfig } from './config'
 import { streamViaGatewayWebSocket } from './gateway'
 import { deriveSessionKey, extractLatestUserMessageText } from './translate'
 import { genId, toRunError } from './utils'
+import { getInternalDownloadUrl } from '#/lib/minio-client'
 
 export function createOpenClawSessionStream(
   options: SessionBridgeOptions,
@@ -33,9 +34,21 @@ async function runSessionBridge(
   const runId = genId('run')
 
   try {
-    const prompt = extractLatestUserMessageText(options.messages)
+    let prompt = extractLatestUserMessageText(options.messages)
     if (!prompt) {
       throw new Error('No user message found to send to OpenClaw')
+    }
+
+    if (options.attachments && options.attachments.length > 0) {
+      const attachmentLines: string[] = []
+      for (const att of options.attachments) {
+        const url = await getInternalDownloadUrl(att.key)
+        const sizeKB = Math.round(att.sizeBytes / 1024)
+        attachmentLines.push(
+          `[Attached file: ${att.originalName} (${att.contentType}, ${sizeKB}KB)]\nURL: ${url}`,
+        )
+      }
+      prompt = prompt + '\n\n' + attachmentLines.join('\n\n')
     }
 
     const config = getBridgeConfig()
