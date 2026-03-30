@@ -104,6 +104,8 @@ function ChatView({
     { key: string; originalName: string; contentType: string; sizeBytes: number; previewUrl?: string }[]
   >([])
   const [isUploading, setIsUploading] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
+  const dragCounterRef = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -116,12 +118,11 @@ function ChatView({
     el.style.height = Math.min(el.scrollHeight, 160) + 'px'
   }, [])
 
-  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = e.target.files
-    if (!files || files.length === 0) return
+  async function uploadFiles(files: File[]) {
+    if (files.length === 0) return
     setIsUploading(true)
     try {
-      for (const file of Array.from(files)) {
+      for (const file of files) {
         const { uploadUrl, key } = await requestUpload({
           data: {
             filename: file.name,
@@ -158,7 +159,47 @@ function ChatView({
       console.error('Upload failed:', err)
     } finally {
       setIsUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+    void uploadFiles(Array.from(files))
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleDragEnter(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current += 1
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true)
+    }
+  }
+
+  function handleDragLeave(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current -= 1
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false)
+    }
+  }
+
+  function handleDragOver(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current = 0
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      void uploadFiles(files)
     }
   }
 
@@ -262,7 +303,31 @@ function ChatView({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div
+      className="relative flex flex-1 flex-col overflow-hidden"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Drop overlay */}
+      <AnimatePresence>
+        {isDragging && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="absolute inset-0 z-50 flex items-center justify-center bg-terra-500/10 backdrop-blur-sm border-2 border-dashed border-terra-400 dark:border-terra-500 rounded-xl m-2"
+          >
+            <div className="flex flex-col items-center gap-2 text-terra-600 dark:text-terra-400">
+              <Paperclip className="h-8 w-8" />
+              <p className="text-sm font-medium">Drop files to attach</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Message list */}
       <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6" ref={scrollContainerRef}>
         <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
