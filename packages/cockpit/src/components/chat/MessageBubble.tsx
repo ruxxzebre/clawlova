@@ -12,7 +12,8 @@ import { StreamingText } from './StreamingText'
 const LONG_MESSAGE_THRESHOLD = 1000
 const PREVIEW_LENGTH = 120
 
-const ATTACHMENT_REGEX = /\[Attached file: (.+?) \((.+?), (\d+)KB\)\]\nURL: .+/g
+// Matches both client-side markers (with key:) and server-enriched markers (with URL:)
+const ATTACHMENT_REGEX = /\[Attached file: (.+?) \((.+?), (\d+)KB\)(?: key:.+?)?\](?:\nURL: .+)?/g
 
 function parseAttachments(
   text: string,

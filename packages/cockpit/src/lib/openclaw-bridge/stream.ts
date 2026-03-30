@@ -39,16 +39,23 @@ async function runSessionBridge(
       throw new Error('No user message found to send to OpenClaw')
     }
 
-    if (options.attachments && options.attachments.length > 0) {
-      const attachmentLines: string[] = []
-      for (const att of options.attachments) {
+    // Parse attachment markers embedded in the message text by the client
+    // Format: [Attached file: name (type, NKB) key:uploads/uuid_name]
+    const attachmentRegex = /\[Attached file: (.+?) \((.+?), (\d+)KB\) key:(.+?)\]/g
+    let match: RegExpExecArray | null
+    const attachments: { name: string; type: string; sizeKB: number; key: string }[] = []
+    while ((match = attachmentRegex.exec(prompt)) !== null) {
+      attachments.push({ name: match[1], type: match[2], sizeKB: Number(match[3]), key: match[4] })
+    }
+    if (attachments.length > 0) {
+      // Replace client markers with URL-enriched versions
+      for (const att of attachments) {
         const url = await getInternalDownloadUrl(att.key)
-        const sizeKB = Math.round(att.sizeBytes / 1024)
-        attachmentLines.push(
-          `[Attached file: ${att.originalName} (${att.contentType}, ${sizeKB}KB)]\nURL: ${url}`,
+        prompt = prompt.replace(
+          `[Attached file: ${att.name} (${att.type}, ${att.sizeKB}KB) key:${att.key}]`,
+          `[Attached file: ${att.name} (${att.type}, ${att.sizeKB}KB)]\nURL: ${url}`,
         )
       }
-      prompt = prompt + '\n\n' + attachmentLines.join('\n\n')
     }
 
     const config = getBridgeConfig()

@@ -91,6 +91,7 @@ function ChatView({
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     connection: fetchServerSentEvents('/api/chat'),
     initialMessages,
+    body: sessionKey ? { sessionKey } : undefined,
     onFinish: onChatFinish,
   })
 
@@ -271,22 +272,22 @@ function ChatView({
     if ((!text && pendingFiles.length === 0) || isLoading) return
     setLastInput(text)
     setInput('')
-    const attachments = pendingFiles.map(({ key, originalName, contentType, sizeBytes }) => ({
-      key,
-      originalName,
-      contentType,
-      sizeBytes,
-    }))
+    let messageText = text || 'See attached file(s)'
+    if (pendingFiles.length > 0) {
+      const markers = pendingFiles.map((f) => {
+        const sizeKB = Math.round(f.sizeBytes / 1024)
+        return `[Attached file: ${f.originalName} (${f.contentType}, ${sizeKB}KB) key:${f.key}]`
+      })
+      messageText += '\n\n' + markers.join('\n')
+    }
     setPendingFiles([])
     if (inputRef.current) inputRef.current.style.height = 'auto'
-    await sendMessage(text || 'See attached file(s)', {
-      body: { sessionKey, attachments },
-    })
+    await sendMessage(messageText)
   }
 
   async function handleRetry() {
     if (!lastInput || isLoading) return
-    await sendMessage(lastInput, { body: { sessionKey } })
+    await sendMessage(lastInput)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {

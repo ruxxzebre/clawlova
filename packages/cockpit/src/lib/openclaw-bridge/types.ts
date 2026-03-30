@@ -1,17 +1,9 @@
 import type { StreamChunk, UIMessage } from '@tanstack/ai'
 
-export interface FileAttachment {
-  key: string
-  originalName: string
-  contentType: string
-  sizeBytes: number
-}
-
 export interface SessionBridgeOptions {
   messages: UIMessage[]
   abortSignal?: AbortSignal
   sessionKey?: string
-  attachments?: FileAttachment[]
 }
 
 export interface DeviceIdentity {
