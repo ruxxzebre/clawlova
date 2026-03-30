@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { loadSession } from '#/server/functions'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { ArrowDown, Check, Code, Lightbulb, MessageCircle, Paperclip, RefreshCw, Send, Square, Wrench, X } from 'lucide-react'
-import { requestUpload, confirmUpload } from '#/server/functions'
 import { useChatUIStore } from '#/lib/chat-store'
 import { motion, AnimatePresence } from 'motion/react'
 import type { UIMessage } from '@tanstack/ai'
@@ -124,36 +123,19 @@ function ChatView({
     setIsUploading(true)
     try {
       for (const file of files) {
-        const { uploadUrl, key } = await requestUpload({
-          data: {
-            filename: file.name,
-            contentType: file.type,
-            sizeBytes: file.size,
-          },
-        })
-
-        await fetch(uploadUrl, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
-        })
-
-        await confirmUpload({
-          data: {
-            key,
-            originalName: file.name,
-            contentType: file.type,
-            sizeBytes: file.size,
-          },
-        })
-
+        const formData = new FormData()
+        formData.append('file', file)
+        const res = await fetch('/api/upload', { method: 'POST', body: formData })
+        if (!res.ok) throw new Error('Upload failed')
+        const { key, originalName, contentType, sizeBytes } = await res.json() as {
+          key: string; originalName: string; contentType: string; sizeBytes: number
+        }
         const previewUrl = file.type.startsWith('image/')
           ? URL.createObjectURL(file)
           : undefined
-
         setPendingFiles((prev) => [
           ...prev,
-          { key, originalName: file.name, contentType: file.type, sizeBytes: file.size, previewUrl },
+          { key, originalName, contentType, sizeBytes, previewUrl },
         ])
       }
     } catch (err) {

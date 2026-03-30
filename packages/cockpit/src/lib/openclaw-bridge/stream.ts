@@ -7,7 +7,6 @@ import { getBridgeConfig } from './config'
 import { streamViaGatewayWebSocket } from './gateway'
 import { deriveSessionKey, extractLatestUserMessageText } from './translate'
 import { genId, toRunError } from './utils'
-import { getInternalDownloadUrl } from '#/lib/minio-client'
 
 export function createOpenClawSessionStream(
   options: SessionBridgeOptions,
@@ -48,12 +47,12 @@ async function runSessionBridge(
       attachments.push({ name: match[1], type: match[2], sizeKB: Number(match[3]), key: match[4] })
     }
     if (attachments.length > 0) {
-      // Replace client markers with URL-enriched versions
+      // Replace client markers with filesystem paths the agent can access
       for (const att of attachments) {
-        const url = await getInternalDownloadUrl(att.key)
+        const agentPath = `/home/node/.openclaw/workspace/${att.key}`
         prompt = prompt.replace(
           `[Attached file: ${att.name} (${att.type}, ${att.sizeKB}KB) key:${att.key}]`,
-          `[Attached file: ${att.name} (${att.type}, ${att.sizeKB}KB)]\nURL: ${url}`,
+          `[Attached file: ${att.name} (${att.type}, ${att.sizeKB}KB)]\nFile path: ${agentPath}`,
         )
       }
     }

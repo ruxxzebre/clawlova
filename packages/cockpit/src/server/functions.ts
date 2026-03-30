@@ -7,8 +7,6 @@ import {
   mergeConfig,
   validateEditableSections,
 } from '#/lib/openclaw-config'
-import { getUploadUrl, getDownloadUrl, objectExists } from '#/lib/minio-client'
-import { addFile, getFile } from '#/lib/file-registry'
 
 // ---------------------------------------------------------------------------
 // Type helpers
@@ -33,26 +31,6 @@ type Serializable<T> =
 export function serialize<T>(value: T): Serializable<T> {
   return value as Serializable<T>
 }
-
-// ---------------------------------------------------------------------------
-// Upload constants
-// ---------------------------------------------------------------------------
-
-const ALLOWED_CONTENT_TYPES = new Set([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/svg+xml',
-  'application/pdf',
-  'text/plain',
-  'text/csv',
-  'text/markdown',
-  'application/json',
-  'application/xml',
-])
-
-const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25 MB
 
 // ---------------------------------------------------------------------------
 // Sessions
@@ -206,73 +184,3 @@ export const fetchModels = createServerFn({ method: 'GET' })
     }
   })
 
-// ---------------------------------------------------------------------------
-// File uploads
-// ---------------------------------------------------------------------------
-
-export const requestUpload = createServerFn({ method: 'POST' })
-  .inputValidator(
-    (data: {
-      filename: string
-      contentType: string
-      sizeBytes: number
-      sessionKey?: string
-    }) => data,
-  )
-  .handler(async ({ data }) => {
-    if (!ALLOWED_CONTENT_TYPES.has(data.contentType)) {
-      throw new Error(`File type not allowed: ${data.contentType}`)
-    }
-    if (data.sizeBytes > MAX_FILE_SIZE) {
-      throw new Error(
-        `File too large: ${data.sizeBytes} bytes (max ${MAX_FILE_SIZE})`,
-      )
-    }
-
-    const uuid = crypto.randomUUID()
-    const safeName = data.filename.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const key = `uploads/${uuid}_${safeName}`
-
-    const uploadUrl = await getUploadUrl(key, data.contentType)
-    return { uploadUrl, key }
-  })
-
-export const confirmUpload = createServerFn({ method: 'POST' })
-  .inputValidator(
-    (data: {
-      key: string
-      originalName: string
-      contentType: string
-      sizeBytes: number
-      sessionKey?: string
-    }) => data,
-  )
-  .handler(async ({ data }) => {
-    const exists = await objectExists(data.key)
-    if (!exists) {
-      throw new Error(`Object not found in storage: ${data.key}`)
-    }
-
-    await addFile({
-      key: data.key,
-      originalName: data.originalName,
-      contentType: data.contentType,
-      sizeBytes: data.sizeBytes,
-      uploadedAt: new Date().toISOString(),
-      sessionKey: data.sessionKey,
-    })
-
-    const downloadUrl = await getDownloadUrl(data.key)
-    return { downloadUrl }
-  })
-
-export const getFileUrl = createServerFn({ method: 'GET' })
-  .inputValidator((data: { key: string }) => data)
-  .handler(async ({ data }) => {
-    const record = await getFile(data.key)
-    if (!record) {
-      throw new Error(`File not found in registry: ${data.key}`)
-    }
-    const downloadUrl = await getDownloadUrl(data.key)
-    return { downloadUrl, record }
-  })
