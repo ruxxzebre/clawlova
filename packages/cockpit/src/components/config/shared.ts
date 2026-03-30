@@ -46,11 +46,11 @@ export interface SectionProps {
 // ---------------------------------------------------------------------------
 
 export const inputCls =
-  'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:border-teal-400 dark:focus:ring-teal-400'
+  'w-full rounded-lg border border-sand-200 bg-sand-50 px-3 py-2 text-sm text-sand-800 placeholder:text-sand-400 focus:border-terra-400 focus:outline-none focus:ring-1 focus:ring-terra-400/30 dark:border-sand-700 dark:bg-sand-800 dark:text-sand-100 dark:placeholder:text-sand-500 dark:focus:border-terra-500 dark:focus:ring-terra-500/30'
 
 export const selectCls = inputCls + ' appearance-none'
 
-export const labelCls = 'block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1'
+export const labelCls = 'block text-xs font-medium text-sand-600 dark:text-sand-400 mb-1'
 
 export const btnCls =
   'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed'

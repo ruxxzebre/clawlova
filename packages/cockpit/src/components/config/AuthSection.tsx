@@ -67,7 +67,7 @@ export function AuthSection({ form, setForm }: SectionProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Key className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <Key className="h-4 w-4 text-terra-500 dark:text-terra-400" />
           <CardTitle>Auth Profiles</CardTitle>
         </div>
         <CardDescription>
@@ -77,7 +77,7 @@ export function AuthSection({ form, setForm }: SectionProps) {
       </CardHeader>
       <CardContent className="space-y-4">
         {profileEntries.length === 0 && !showAddForm && (
-          <p className="text-sm text-slate-500 dark:text-slate-400">
+          <p className="text-sm text-sand-500 dark:text-sand-400">
             No auth profiles configured.
           </p>
         )}
@@ -85,11 +85,11 @@ export function AuthSection({ form, setForm }: SectionProps) {
         {profileEntries.map(([id, profile]) => (
           <div
             key={id}
-            className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50"
+            className="flex items-center gap-3 rounded-lg border border-sand-200 bg-sand-100 p-3 dark:border-sand-700 dark:bg-sand-800/50"
           >
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-3">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                <p className="text-sm font-medium text-sand-700 dark:text-sand-200">
                   {id}
                 </p>
                 <select
@@ -102,9 +102,9 @@ export function AuthSection({ form, setForm }: SectionProps) {
                   <option value="token">Token</option>
                 </select>
               </div>
-              <p className="text-xs text-slate-400 dark:text-slate-500">
+              <p className="text-xs text-sand-400 dark:text-sand-500">
                 Set key via env var:{' '}
-                <code className="rounded bg-slate-200 px-1 py-0.5 font-mono dark:bg-slate-700">
+                <code className="rounded bg-sand-200 px-1 py-0.5 font-mono dark:bg-sand-700">
                   {ENV_VAR_HINTS[profile.provider] ?? `${profile.provider.toUpperCase()}_API_KEY`}
                 </code>
               </p>
@@ -120,8 +120,8 @@ export function AuthSection({ form, setForm }: SectionProps) {
         ))}
 
         {showAddForm ? (
-          <div className="space-y-3 rounded-lg border border-dashed border-teal-300 bg-teal-50/50 p-3 dark:border-teal-700 dark:bg-teal-900/10">
-            <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-3 rounded-lg border border-dashed border-terra-300 bg-terra-50/50 p-3 dark:border-terra-700 dark:bg-terra-900/10">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Provider</label>
                 <select
@@ -153,14 +153,14 @@ export function AuthSection({ form, setForm }: SectionProps) {
               <button
                 type="button"
                 onClick={addProfile}
-                className={`${btnCls} bg-teal-600 text-white hover:bg-teal-700 dark:bg-teal-500 dark:hover:bg-teal-600`}
+                className={`${btnCls} bg-terra-500 text-white hover:bg-terra-600 dark:bg-terra-600 dark:hover:bg-terra-500`}
               >
                 Add
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddForm(false)}
-                className={`${btnCls} text-slate-500 hover:text-slate-700 dark:text-slate-400`}
+                className={`${btnCls} text-sand-500 hover:text-sand-700 dark:text-sand-400`}
               >
                 Cancel
               </button>
@@ -170,7 +170,7 @@ export function AuthSection({ form, setForm }: SectionProps) {
           <button
             type="button"
             onClick={() => setShowAddForm(true)}
-            className={`${btnCls} border border-dashed border-slate-300 text-slate-500 hover:border-teal-400 hover:text-teal-600 dark:border-slate-600 dark:text-slate-400 dark:hover:border-teal-500 dark:hover:text-teal-400`}
+            className={`${btnCls} border border-dashed border-sand-300 text-sand-500 hover:border-terra-400 hover:text-terra-600 dark:border-sand-600 dark:text-sand-400 dark:hover:border-terra-500 dark:hover:text-terra-400`}
           >
             <Plus className="h-3.5 w-3.5" />
             Add Provider

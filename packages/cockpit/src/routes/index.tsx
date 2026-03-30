@@ -1,9 +1,11 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useChat } from '@tanstack/ai-react'
 import { fetchServerSentEvents } from '@tanstack/ai-client'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useRef, useState } from 'react'
-import { ArrowDown, Send, Square } from 'lucide-react'
+import { loadSession } from '#/server/functions'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { ArrowDown, Code, Lightbulb, MessageCircle, RefreshCw, Send, Square, Wrench } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
 import type { UIMessage } from '@tanstack/ai'
 import { MessageBubble } from '#/components/chat/MessageBubble'
 import { ThinkingDots } from '#/components/chat/ThinkingDots'
@@ -18,6 +20,13 @@ export const Route = createFileRoute('/')({
   }),
 })
 
+const STARTER_PROMPTS = [
+  { icon: Code, label: 'Write code', prompt: 'Help me write a ' },
+  { icon: Lightbulb, label: 'Explain something', prompt: 'Explain how ' },
+  { icon: Wrench, label: 'Debug an issue', prompt: 'Help me debug ' },
+  { icon: MessageCircle, label: 'Brainstorm ideas', prompt: 'Brainstorm ideas for ' },
+]
+
 // ---------------------------------------------------------------------------
 // Outer component: handles routing, data fetching, and keyed remounting
 // ---------------------------------------------------------------------------
@@ -29,26 +38,22 @@ function ChatPage() {
 
   const chatKey = session ?? `new-${search.new ?? 0}`
 
-  // Fetch saved messages when resuming a session
   const { data: savedMessages, isLoading: isLoadingSession } = useQuery({
     queryKey: ['session', session],
     queryFn: () =>
-      fetch(`/api/session?key=${encodeURIComponent(session!)}`)
-        .then((r) => r.json())
-        .then((msgs: Array<UIMessage & { createdAt?: string }>) =>
-          msgs.map((m) => ({
-            ...m,
-            createdAt: m.createdAt ? new Date(m.createdAt) : undefined,
-          })),
-        ),
+      loadSession({ data: { key: session! } }).then((msgs) =>
+        msgs.map((m) => ({
+          ...m,
+          createdAt: m.createdAt ? new Date(m.createdAt) : undefined,
+        })),
+      ),
     enabled: !!session,
   })
 
-  // Wait for messages to load before mounting ChatView
   if (session && isLoadingSession) {
     return (
       <div className="flex flex-1 items-center justify-center">
-        <div className="text-sm text-slate-500 dark:text-slate-400">
+        <div className="text-sm text-sand-500 dark:text-sand-400">
           Loading conversation…
         </div>
       </div>
@@ -80,6 +85,7 @@ function ChatView({
   initialMessages?: UIMessage[]
   onChatFinish: () => void
 }) {
+  const navigate = useNavigate()
   const { messages, sendMessage, isLoading, error, stop } = useChat({
     connection: fetchServerSentEvents('/api/chat'),
     initialMessages,
@@ -89,11 +95,18 @@ function ChatView({
 
   const [input, setInput] = useState('')
   const [isAtBottom, setIsAtBottom] = useState(true)
+  const [lastInput, setLastInput] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
-  // Track whether the bottom sentinel is visible via IntersectionObserver
+  const resizeTextarea = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+  }, [])
+
   useEffect(() => {
     const sentinel = messagesEndRef.current
     const container = scrollContainerRef.current
@@ -106,12 +119,41 @@ function ChatView({
     return () => observer.disconnect()
   }, [])
 
-  // Auto-scroll to bottom when messages change, only if already at bottom
   useEffect(() => {
     if (isAtBottom) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+      // During streaming, scroll instantly to avoid competing smooth-scroll animations
+      // that cause a hitchy feel. Only use smooth scroll for completed messages.
+      messagesEndRef.current?.scrollIntoView({
+        behavior: isLoading ? 'instant' : 'smooth',
+      })
     }
-  }, [messages, isAtBottom])
+  }, [messages, isAtBottom, isLoading])
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault()
+        navigate({ to: '/', search: { new: Date.now() } })
+        return
+      }
+      if (e.key === 'Escape') {
+        if (isLoading) {
+          e.preventDefault()
+          stop()
+        } else if (document.activeElement === inputRef.current) {
+          inputRef.current?.blur()
+        }
+        return
+      }
+      if (e.key === '/' && !isInputFocused()) {
+        e.preventDefault()
+        inputRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [isLoading, stop, navigate])
 
   function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -122,8 +164,15 @@ function ChatView({
     e.preventDefault()
     const text = input.trim()
     if (!text || isLoading) return
+    setLastInput(text)
     setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
     await sendMessage(text)
+  }
+
+  async function handleRetry() {
+    if (!lastInput || isLoading) return
+    await sendMessage(lastInput)
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -133,23 +182,57 @@ function ChatView({
     }
   }
 
+  function handleStarterClick(prompt: string) {
+    setInput(prompt)
+    inputRef.current?.focus()
+    requestAnimationFrame(resizeTextarea)
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Message list */}
-      <div className="relative flex-1 overflow-y-auto px-4 py-6" ref={scrollContainerRef}>
-        <div className="mx-auto max-w-3xl space-y-4">
-          {messages.length === 0 && (
-            <div className="flex h-full items-center justify-center py-20 text-center">
-              <div>
-                <p className="text-lg font-medium text-slate-800 dark:text-slate-100">
-                  OpenClaw Chat
+      <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6" ref={scrollContainerRef}>
+        <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
+          <AnimatePresence mode="wait">
+            {messages.length === 0 && (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="flex h-full flex-col items-center justify-center py-16 text-center"
+              >
+                <p className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-sand-800 dark:text-sand-100">
+                  What can I help with?
                 </p>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                  Send a message to start the conversation
+                <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-sand-500 dark:text-sand-400">
+                  Ask anything — powered by OpenClaw
                 </p>
-              </div>
-            </div>
-          )}
+                <div className="mt-6 sm:mt-8 grid grid-cols-2 gap-2 sm:gap-2.5 w-full max-w-md">
+                  {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }, i) => (
+                    <motion.button
+                      key={label}
+                      type="button"
+                      onClick={() => handleStarterClick(prompt)}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 + i * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="group flex items-center gap-2 sm:gap-2.5 rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-50 dark:bg-sand-900 px-3 py-2.5 sm:px-4 sm:py-3 text-left text-xs sm:text-sm text-sand-600 dark:text-sand-300 transition-colors hover:border-terra-300 hover:text-terra-600 dark:hover:border-terra-600 dark:hover:text-terra-400"
+                    >
+                      <Icon className="h-4 w-4 flex-shrink-0 text-sand-400 group-hover:text-terra-500 dark:text-sand-500 dark:group-hover:text-terra-400 transition-colors" />
+                      {label}
+                    </motion.button>
+                  ))}
+                </div>
+                <p className="mt-6 hidden sm:block text-xs text-sand-400 dark:text-sand-500">
+                  Press <kbd className="rounded border border-sand-300 dark:border-sand-600 bg-sand-100 dark:bg-sand-800 px-1.5 py-0.5 font-mono text-[11px]">/</kbd> to focus input &middot; <kbd className="rounded border border-sand-300 dark:border-sand-600 bg-sand-100 dark:bg-sand-800 px-1.5 py-0.5 font-mono text-[11px]">Esc</kbd> to stop
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {messages.map((message, index) => (
             <MessageBubble
@@ -160,76 +243,119 @@ function ChatView({
           ))}
 
           {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl rounded-tl-sm bg-slate-100 dark:bg-slate-700 px-4 py-3 text-slate-500 dark:text-slate-400">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex justify-start"
+            >
+              <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sand-500 dark:text-sand-400">
                 <ThinkingDots />
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {error && (
-            <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-              Error: {error.message}
-            </div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-xl border border-red-300/40 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 px-4 py-3 text-sm"
+              >
+                <p className="text-red-700 dark:text-red-300">
+                  Something went wrong — {error.message}
+                </p>
+                {lastInput && (
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-100 dark:hover:bg-red-500/20"
+                  >
+                    <RefreshCw className="h-3 w-3" />
+                    Try again
+                  </button>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <div ref={messagesEndRef} />
         </div>
 
         {/* Scroll to bottom button */}
-        {!isAtBottom && (
-          <button
-            type="button"
-            onClick={scrollToBottom}
-            className="sticky bottom-4 mx-auto flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 shadow-lg backdrop-blur-sm transition hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl"
-          >
-            <ArrowDown className="h-3.5 w-3.5" />
-            Scroll to bottom
-          </button>
-        )}
+        <AnimatePresence>
+          {!isAtBottom && (
+            <motion.button
+              type="button"
+              onClick={scrollToBottom}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+              className="sticky bottom-4 mx-auto flex items-center gap-1.5 rounded-full border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 px-3 py-1.5 text-xs font-medium text-sand-600 dark:text-sand-300 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
+            >
+              <ArrowDown className="h-3.5 w-3.5" />
+              Scroll to bottom
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Input area */}
-      <div className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3">
+      <div className="border-t border-sand-200 dark:border-sand-800 bg-sand-50 dark:bg-sand-950 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3">
         <div className="mx-auto max-w-3xl">
-          <form onSubmit={handleSubmit} className="flex gap-3">
+          <form onSubmit={handleSubmit} className="flex gap-2 sm:gap-3">
             <textarea
               ref={inputRef}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => {
+                setInput(e.target.value)
+                resizeTextarea()
+              }}
               onKeyDown={handleKeyDown}
               placeholder={
                 isLoading
                   ? 'OpenClaw is responding...'
-                  : 'Message OpenClaw… (Enter to send, Shift+Enter for newline)'
+                  : 'Message OpenClaw…'
               }
               disabled={isLoading}
               aria-disabled={isLoading}
               rows={1}
-              className="flex-1 resize-none rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4 py-2.5 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 outline-none focus:border-slate-400 dark:focus:border-slate-500 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500 dark:disabled:bg-slate-800/80 dark:disabled:text-slate-400 disabled:opacity-60"
-              style={{ maxHeight: '10rem', overflowY: 'auto' }}
+              className="flex-1 resize-none rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-3 py-2.5 sm:px-4 text-sm sm:text-base text-sand-800 dark:text-sand-100 placeholder:text-sand-400 outline-none focus:border-terra-400 dark:focus:border-terra-500 focus:ring-1 focus:ring-terra-400/30 disabled:cursor-not-allowed disabled:bg-sand-200 disabled:text-sand-500 dark:disabled:bg-sand-800/80 dark:disabled:text-sand-400 disabled:opacity-60"
             />
             {isLoading ? (
-              <button
+              <motion.button
                 type="button"
                 onClick={stop}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition hover:bg-red-700"
+                title="Stop generating (Esc)"
+                whileTap={{ scale: 0.92 }}
+                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition-colors hover:bg-red-700"
               >
                 <Square className="h-3.5 w-3.5 fill-current" />
-              </button>
+              </motion.button>
             ) : (
-              <button
+              <motion.button
                 type="submit"
                 disabled={!input.trim()}
                 aria-disabled={!input.trim()}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900 transition hover:opacity-80 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"
+                title="Send message (Enter)"
+                whileTap={{ scale: 0.92 }}
+                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-terra-500 text-white transition-colors hover:bg-terra-600 disabled:cursor-not-allowed disabled:bg-sand-300 disabled:text-sand-500 dark:disabled:bg-sand-700 dark:disabled:text-sand-400"
               >
                 <Send className="h-4 w-4" />
-              </button>
+              </motion.button>
             )}
           </form>
         </div>
       </div>
     </div>
   )
+}
+
+function isInputFocused(): boolean {
+  const el = document.activeElement
+  if (!el) return false
+  const tag = el.tagName.toLowerCase()
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || (el as HTMLElement).isContentEditable
 }

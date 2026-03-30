@@ -1,13 +1,47 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
 @import 'tailwindcss';
 @plugin '@tailwindcss/typography';
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Warm color system ─────────────────────────────────────────────── */
+@theme {
+  /* Sand neutrals — warm stone-tinted grays */
+  --color-sand-50: oklch(0.98 0.005 80);
+  --color-sand-100: oklch(0.95 0.008 80);
+  --color-sand-200: oklch(0.90 0.012 80);
+  --color-sand-300: oklch(0.83 0.016 80);
+  --color-sand-400: oklch(0.70 0.020 75);
+  --color-sand-500: oklch(0.58 0.022 70);
+  --color-sand-600: oklch(0.48 0.020 68);
+  --color-sand-700: oklch(0.38 0.018 65);
+  --color-sand-800: oklch(0.28 0.015 62);
+  --color-sand-900: oklch(0.20 0.012 60);
+  --color-sand-950: oklch(0.14 0.010 58);
+
+  /* Terracotta accent — warm, earthy, distinctive */
+  --color-terra-50: oklch(0.97 0.012 40);
+  --color-terra-100: oklch(0.93 0.030 38);
+  --color-terra-200: oklch(0.86 0.058 35);
+  --color-terra-300: oklch(0.76 0.095 32);
+  --color-terra-400: oklch(0.66 0.130 30);
+  --color-terra-500: oklch(0.58 0.145 28);
+  --color-terra-600: oklch(0.50 0.135 27);
+  --color-terra-700: oklch(0.42 0.115 26);
+  --color-terra-800: oklch(0.35 0.090 25);
+  --color-terra-900: oklch(0.26 0.065 24);
+
+  /* Font families */
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
 body {
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
 
 /* Compact prose spacing for chat bubbles */
 .prose-chat {

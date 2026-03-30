@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { toServerSentEventsResponse } from '@tanstack/ai'
-import { createOpenClawSessionStream } from '#/lib/openclaw-session-bridge'
+import { createOpenClawSessionStream } from '#/lib/openclaw-bridge'
 
 export const Route = createFileRoute('/api/chat')({
   server: {

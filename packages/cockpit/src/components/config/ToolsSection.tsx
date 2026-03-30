@@ -33,13 +33,13 @@ export function ToolsSection({ form, setForm }: SectionProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Wrench className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <Wrench className="h-4 w-4 text-terra-500 dark:text-terra-400" />
           <CardTitle>Tools</CardTitle>
         </div>
         <CardDescription>Agent tool profile and web search</CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={labelCls}>Profile</label>
             <select
@@ -64,8 +64,8 @@ export function ToolsSection({ form, setForm }: SectionProps) {
                   }
                   className="peer sr-only"
                 />
-                <div className="h-5 w-9 rounded-full bg-slate-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-teal-500 peer-checked:after:translate-x-full dark:bg-slate-600 dark:peer-checked:bg-teal-400" />
-                <span className="text-sm text-slate-600 dark:text-slate-300">
+                <div className="h-5 w-9 rounded-full bg-sand-300 after:absolute after:left-[2px] after:top-[2px] after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all peer-checked:bg-terra-500 peer-checked:after:translate-x-full dark:bg-sand-600 dark:peer-checked:bg-terra-400" />
+                <span className="text-sm text-sand-600 dark:text-sand-300">
                   {searchEnabled ? 'Enabled' : 'Disabled'}
                 </span>
               </label>

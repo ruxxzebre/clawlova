@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import type { UIMessage } from '@tanstack/ai'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import { ChevronDown } from 'lucide-react'
+import { motion } from 'motion/react'
 import { buildMessageDisplayParts } from '#/lib/tool-call-display'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
 import { ThinkingBlock } from './ThinkingBlock'
 import { ThinkingDots } from './ThinkingDots'
 import { ToolCallGroupCard } from './ToolCallGroupCard'
+import { StreamingText } from './StreamingText'
 
 const LONG_MESSAGE_THRESHOLD = 1000
 const PREVIEW_LENGTH = 120
@@ -28,9 +28,9 @@ export function MessageBubble({
     )
     .map((part) => part.toolCall)
   let hasRenderedToolCallGroup = false
-  const hasText = displayParts.some((p) => p.type === 'text')
   const hasToolCalls = toolCalls.length > 0
-  const showDots = isStreaming && !hasText && hasToolCalls
+  const lastPartType = displayParts.length > 0 ? displayParts[displayParts.length - 1]!.type : null
+  const showDots = isStreaming && hasToolCalls && lastPartType !== 'text'
 
   const fullText = displayParts
     .filter((p): p is { type: 'text'; content: string } => p.type === 'text')
@@ -67,69 +67,77 @@ export function MessageBubble({
             )
           }
           return (
-            <div
+            <StreamingText
               key={i}
-              className="prose prose-sm prose-chat dark:prose-invert max-w-none leading-snug"
-            >
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ hr: () => null }}>
-                {part.content}
-              </ReactMarkdown>
-            </div>
+              content={part.content}
+              isStreaming={isStreaming}
+            />
           )
         }
 
         return null
       })}
       {showDots && (
-        <div className="mt-1 -mb-0.5 text-slate-500 dark:text-slate-400">
+        <div className="mt-1 -mb-0.5 text-sand-500 dark:text-sand-400">
           <ThinkingDots />
         </div>
       )}
     </>
   )
 
-  if (isLongAssistant) {
-    const preview = fullText.slice(0, PREVIEW_LENGTH).trimEnd() + '…'
-    return (
-      <div className="flex justify-start">
-        <div className="max-w-[80%] rounded-2xl rounded-tl-sm bg-slate-100 dark:bg-slate-700 text-sm text-slate-800 dark:text-slate-100">
-          {isExpanded ? (
-            <div className="px-4 py-2.5">
-              {renderContent()}
-            </div>
-          ) : (
-            <div className="px-4 py-2.5">
-              <p className="leading-snug text-slate-600 dark:text-slate-300">
-                {preview}
-              </p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => setIsExpanded((v) => !v)}
-            className="flex w-full items-center justify-center gap-1.5 border-t border-slate-200/60 dark:border-slate-600/60 px-3 py-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
-          >
-            {isExpanded ? 'Show less' : 'Show more'}
-            <ChevronDown
-              className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-            />
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div
-        className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
-          isUser
-            ? 'rounded-tr-sm bg-blue-600 text-white'
-            : 'rounded-tl-sm bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100'
-        }`}
-      >
-        {renderContent()}
+  const bubbleContent = isLongAssistant ? (
+    <div className="flex justify-start">
+      <div className="max-w-[92%] sm:max-w-[80%] rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 text-sm text-sand-800 dark:text-sand-100">
+        {isExpanded ? (
+          <div className="px-4 py-3">
+            {renderContent()}
+          </div>
+        ) : (
+          <div className="px-4 py-2.5">
+            <p className="leading-snug text-sand-600 dark:text-sand-300">
+              {fullText.slice(0, PREVIEW_LENGTH).trimEnd() + '…'}
+            </p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setIsExpanded((v) => !v)}
+          className="flex w-full items-center justify-center gap-1.5 border-t border-sand-200/60 dark:border-sand-700/60 px-3 py-1.5 text-xs font-medium text-sand-500 dark:text-sand-400 hover:text-sand-700 dark:hover:text-sand-200 transition-colors"
+        >
+          {isExpanded ? 'Show less' : 'Show more'}
+          <ChevronDown
+            className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          />
+        </button>
       </div>
     </div>
+  ) : (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <motion.div
+        layout={isStreaming ? 'position' : false}
+        transition={isStreaming ? { layout: { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] } } : undefined}
+        className={`max-w-[92%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm ${isUser
+            ? 'rounded-tr-sm bg-terra-500 text-white'
+            : 'rounded-tl-sm bg-sand-100 dark:bg-sand-800 text-sand-800 dark:text-sand-100'
+          }`}
+      >
+        {renderContent()}
+      </motion.div>
+    </div>
+  )
+
+  return (
+    <motion.div
+      layout={isStreaming}
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: 0.25,
+        ease: [0.16, 1, 0.3, 1],
+        layout: { duration: 0.12, ease: 'easeOut' },
+      }}
+    >
+      {bubbleContent}
+    </motion.div>
   )
 }

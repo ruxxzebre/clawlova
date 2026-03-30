@@ -9,7 +9,7 @@ import {
   extractLatestUserMessageText,
   resolveAuthMode,
   translateGatewayEvent,
-} from './openclaw-session-bridge'
+} from './openclaw-bridge'
 
 function createState() {
   return {

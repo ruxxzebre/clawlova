@@ -1,36 +1,47 @@
 import { useState } from 'react'
 import { Brain, ChevronDown } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
 
 export function ThinkingBlock({ content }: { content: string }) {
   const [isOpen, setIsOpen] = useState(false)
 
   return (
-    <div className="my-2 overflow-hidden rounded-xl border border-violet-300/50 bg-violet-50/50 dark:border-violet-500/30 dark:bg-violet-900/20">
+    <div className="-mx-1.5 my-4 overflow-hidden rounded-xl border border-amber-300/40 bg-amber-50/50 dark:border-amber-500/20 dark:bg-amber-900/15">
       <button
         type="button"
         onClick={() => setIsOpen((current) => !current)}
         className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="rounded-md bg-violet-100 p-1.5 dark:bg-violet-500/20">
-            <Brain className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400" />
+          <span className="rounded-md bg-amber-100 p-1.5 dark:bg-amber-500/20">
+            <Brain className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           </span>
-          <span className="text-xs font-medium text-violet-700 dark:text-violet-300">
+          <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
             Thinking
           </span>
         </div>
-        <ChevronDown
-          className={`h-4 w-4 text-violet-500 transition-transform dark:text-violet-400 ${isOpen ? 'rotate-180' : ''}`}
-        />
+        <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
+          <ChevronDown className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+        </motion.div>
       </button>
 
-      {isOpen && (
-        <div className="border-t border-violet-200/60 px-3 py-3 dark:border-violet-500/20">
-          <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 dark:text-slate-300">
-            {content}
-          </pre>
-        </div>
-      )}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="border-t border-amber-200/50 px-3 py-3 dark:border-amber-500/15">
+              <pre className="whitespace-pre-wrap text-xs leading-relaxed text-sand-700 dark:text-sand-300">
+                {content}
+              </pre>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

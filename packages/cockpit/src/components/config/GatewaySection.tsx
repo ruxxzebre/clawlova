@@ -32,7 +32,7 @@ export function GatewaySection({ form, setForm }: SectionProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Globe className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <Globe className="h-4 w-4 text-terra-500 dark:text-terra-400" />
           <CardTitle>Gateway</CardTitle>
         </div>
         <CardDescription>
@@ -40,7 +40,7 @@ export function GatewaySection({ form, setForm }: SectionProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Port</label>
             <input
@@ -91,7 +91,7 @@ export function GatewaySection({ form, setForm }: SectionProps) {
             <button
               type="button"
               onClick={() => setShowToken((v) => !v)}
-              className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-700"
+              className="rounded-lg border border-sand-200 p-2 text-sand-500 hover:bg-sand-100 dark:border-sand-700 dark:text-sand-400 dark:hover:bg-sand-800"
             >
               {showToken ? (
                 <EyeOff className="h-4 w-4" />

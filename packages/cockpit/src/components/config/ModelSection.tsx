@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Cpu } from 'lucide-react'
+import { fetchModels } from '#/server/functions'
 import {
   Card,
   CardHeader,
@@ -15,6 +16,7 @@ export function ModelSection({ form, setForm }: SectionProps) {
   const primary = form.agents?.defaults?.model?.primary ?? ''
   const { provider, modelName } = parseModelId(primary)
   const models = form.agents?.defaults?.models ?? {}
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
   const alias = models[primary]?.alias ?? ''
 
   const { data: modelsData, isLoading: modelsLoading } = useQuery<{
@@ -22,10 +24,7 @@ export function ModelSection({ form, setForm }: SectionProps) {
     source: string
   }>({
     queryKey: ['provider-models', provider],
-    queryFn: () =>
-      fetch(`/api/models?provider=${encodeURIComponent(provider)}`).then((r) =>
-        r.json(),
-      ),
+    queryFn: () => fetchModels({ data: { provider } }),
     enabled: !!provider,
     staleTime: 5 * 60 * 1000,
   })
@@ -38,7 +37,6 @@ export function ModelSection({ form, setForm }: SectionProps) {
     if (availableModels.length > 0 && !availableModels.includes(modelName)) {
       updateModel('modelName', availableModels[0])
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally reacts only to the model list changing
   }, [availableModels])
 
   function updateModel(
@@ -83,7 +81,7 @@ export function ModelSection({ form, setForm }: SectionProps) {
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <Cpu className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+          <Cpu className="h-4 w-4 text-terra-500 dark:text-terra-400" />
           <CardTitle>Model</CardTitle>
         </div>
         <CardDescription>
@@ -96,7 +94,7 @@ export function ModelSection({ form, setForm }: SectionProps) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={labelCls}>Provider</label>
             <select
@@ -114,7 +112,7 @@ export function ModelSection({ form, setForm }: SectionProps) {
           <div>
             <label className={labelCls}>Model</label>
             {modelsLoading ? (
-              <div className={inputCls + ' flex items-center text-slate-400'}>
+              <div className={inputCls + ' flex items-center text-sand-400'}>
                 Loading models…
               </div>
             ) : (

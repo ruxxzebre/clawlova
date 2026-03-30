@@ -5,8 +5,8 @@ import {
 } from '@tanstack/react-router'
 import { TanStackRouterDevtoolsPanel } from '@tanstack/react-router-devtools'
 import { TanStackDevtools } from '@tanstack/react-devtools'
+import { useState, useCallback, useEffect } from 'react'
 import ChatSidebar from '../components/ChatSidebar'
-import Footer from '../components/Footer'
 import Header from '../components/Header'
 
 import TanStackQueryProvider from '../integrations/tanstack-query/root-provider'
@@ -31,37 +31,63 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
       },
       {
         name: 'viewport',
-        content: 'width=device-width, initial-scale=1',
+        content: 'width=device-width, initial-scale=1, viewport-fit=cover',
       },
       {
         title: 'Clawlova',
       },
     ],
     links: [
-      {
-        rel: 'stylesheet',
-        href: appCss,
-      },
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
+      { rel: 'stylesheet', href: appCss },
     ],
   }),
   shellComponent: RootDocument,
 })
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), [])
+  const closeSidebar = useCallback(() => setSidebarOpen(false), [])
+
+  // Close sidebar on route change (mobile)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth >= 768) setSidebarOpen(false)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body className="font-sans antialiased [overflow-wrap:anywhere] selection:bg-[rgba(79,184,178,0.24)]">
+      <body className="font-body antialiased [overflow-wrap:anywhere] bg-sand-50 text-sand-800 dark:bg-sand-950 dark:text-sand-100 selection:bg-terra-200/40 dark:selection:bg-terra-500/30">
         <TanStackQueryProvider>
           <div className="flex h-screen overflow-hidden">
-            <ChatSidebar />
+            {/* Mobile sidebar overlay */}
+            {sidebarOpen && (
+              <div
+                className="fixed inset-0 z-40 bg-sand-950/40 md:hidden"
+                onClick={closeSidebar}
+                onKeyDown={(e) => e.key === 'Escape' && closeSidebar()}
+              />
+            )}
+            <div
+              className={`fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-out md:relative md:w-auto md:translate-x-0 md:transition-none ${
+                sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+              }`}
+            >
+              <ChatSidebar onNavigate={closeSidebar} />
+            </div>
             <div className="flex flex-1 flex-col min-w-0">
-              <Header />
+              <Header onToggleSidebar={toggleSidebar} />
               {children}
-              <Footer />
             </div>
           </div>
           <TanStackDevtools
