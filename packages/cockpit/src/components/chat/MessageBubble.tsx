@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { UIMessage } from '@tanstack/ai'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, FileText } from 'lucide-react'
 import { motion } from 'motion/react'
 import { buildMessageDisplayParts } from '#/lib/tool-call-display'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
@@ -11,6 +11,45 @@ import { StreamingText } from './StreamingText'
 
 const LONG_MESSAGE_THRESHOLD = 1000
 const PREVIEW_LENGTH = 120
+
+const ATTACHMENT_REGEX = /\[Attached file: (.+?) \((.+?), (\d+)KB\)\]\nURL: .+/g
+
+function parseAttachments(
+  text: string,
+): { originalName: string; contentType: string; sizeKB: number }[] {
+  const matches: { originalName: string; contentType: string; sizeKB: number }[] = []
+  let match: RegExpExecArray | null
+  const regex = new RegExp(ATTACHMENT_REGEX.source, 'g')
+  while ((match = regex.exec(text)) !== null) {
+    matches.push({
+      originalName: match[1],
+      contentType: match[2],
+      sizeKB: parseInt(match[3], 10),
+    })
+  }
+  return matches
+}
+
+function stripAttachments(text: string): string {
+  return text.replace(ATTACHMENT_REGEX, '').trim()
+}
+
+function AttachmentChip({
+  originalName,
+  sizeKB,
+}: {
+  originalName: string
+  contentType: string
+  sizeKB: number
+}) {
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs">
+      <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+      <span className="max-w-[150px] truncate">{originalName}</span>
+      <span className="opacity-60">{sizeKB}KB</span>
+    </div>
+  )
+}
 
 export function MessageBubble({
   message,
@@ -61,10 +100,28 @@ export function MessageBubble({
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         if (part.type === 'text') {
           if (isUser) {
+            const attachments = parseAttachments(part.content)
+            const cleanText = stripAttachments(part.content)
             return (
-              <p key={i} className="whitespace-pre-wrap leading-relaxed">
-                {part.content}
-              </p>
+              <div key={i}>
+                {cleanText && (
+                  <p className="whitespace-pre-wrap leading-relaxed">
+                    {cleanText}
+                  </p>
+                )}
+                {attachments.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {attachments.map((att, j) => (
+                      <AttachmentChip
+                        key={j}
+                        originalName={att.originalName}
+                        contentType={att.contentType}
+                        sizeKB={att.sizeKB}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             )
           }
           return (
