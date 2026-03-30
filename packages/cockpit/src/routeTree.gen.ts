@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as ConfigRouteImport } from './routes/config'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiUploadRouteImport } from './routes/api.upload'
+import { Route as ApiFileRouteImport } from './routes/api.file'
 import { Route as ApiChatRouteImport } from './routes/api.chat'
 
 const ConfigRoute = ConfigRouteImport.update({
@@ -29,6 +30,11 @@ const ApiUploadRoute = ApiUploadRouteImport.update({
   path: '/api/upload',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFileRoute = ApiFileRouteImport.update({
+  id: '/api/file',
+  path: '/api/file',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/config': typeof ConfigRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/file': typeof ApiFileRoute
   '/api/upload': typeof ApiUploadRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/config': typeof ConfigRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/file': typeof ApiFileRoute
   '/api/upload': typeof ApiUploadRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,22 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/config': typeof ConfigRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/file': typeof ApiFileRoute
   '/api/upload': typeof ApiUploadRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/config' | '/api/chat' | '/api/upload'
+  fullPaths: '/' | '/config' | '/api/chat' | '/api/file' | '/api/upload'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/config' | '/api/chat' | '/api/upload'
-  id: '__root__' | '/' | '/config' | '/api/chat' | '/api/upload'
+  to: '/' | '/config' | '/api/chat' | '/api/file' | '/api/upload'
+  id: '__root__' | '/' | '/config' | '/api/chat' | '/api/file' | '/api/upload'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ConfigRoute: typeof ConfigRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiFileRoute: typeof ApiFileRoute
   ApiUploadRoute: typeof ApiUploadRoute
 }
 
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUploadRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/file': {
+      id: '/api/file'
+      path: '/api/file'
+      fullPath: '/api/file'
+      preLoaderRoute: typeof ApiFileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -106,6 +123,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ConfigRoute: ConfigRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiFileRoute: ApiFileRoute,
   ApiUploadRoute: ApiUploadRoute,
 }
 export const routeTree = rootRouteImport

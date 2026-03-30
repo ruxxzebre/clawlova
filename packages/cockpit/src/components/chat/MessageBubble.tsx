@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { UIMessage } from '@tanstack/ai'
-import { ChevronDown, FileText } from 'lucide-react'
-import { motion } from 'motion/react'
+import { ChevronDown, FileText, X } from 'lucide-react'
+import { motion, AnimatePresence } from 'motion/react'
 import { buildMessageDisplayParts } from '#/lib/tool-call-display'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
 import { ThinkingBlock } from './ThinkingBlock'
@@ -12,43 +12,128 @@ import { StreamingText } from './StreamingText'
 const LONG_MESSAGE_THRESHOLD = 1000
 const PREVIEW_LENGTH = 120
 
-// Matches both client-side markers (with key:) and server-enriched markers (with URL:)
-const ATTACHMENT_REGEX = /\[Attached file: (.+?) \((.+?), (\d+)KB\)(?: key:.+?)?\](?:\nURL: .+)?/g
+// Matches both client-side markers (with key:) and server-enriched markers (with File path:)
+const ATTACHMENT_REGEX = /\[Attached file: (.+?) \((.+?), (\d+)KB\)(?: key:(.+?))?\](?:\nFile path: (.+))?/g
 
-function parseAttachments(
-  text: string,
-): { originalName: string; contentType: string; sizeKB: number }[] {
-  const matches: { originalName: string; contentType: string; sizeKB: number }[] = []
+interface ParsedAttachment {
+  originalName: string
+  contentType: string
+  sizeKB: number
+  key?: string
+}
+
+function parseAttachments(text: string): ParsedAttachment[] {
+  const matches: ParsedAttachment[] = []
   let match: RegExpExecArray | null
   const regex = new RegExp(ATTACHMENT_REGEX.source, 'g')
   while ((match = regex.exec(text)) !== null) {
+    // Derive key from either the key: field or the File path: field
+    let key = match[4]
+    if (!key && match[5]) {
+      // Extract key from agent path like /home/node/.openclaw/workspace/uploads/uuid_name
+      const pathMatch = match[5].match(/uploads\/(.+)$/)
+      if (pathMatch) key = `uploads/${pathMatch[1]}`
+    }
     matches.push({
       originalName: match[1],
       contentType: match[2],
       sizeKB: parseInt(match[3], 10),
+      key,
     })
   }
   return matches
 }
 
 function stripAttachments(text: string): string {
-  return text.replace(ATTACHMENT_REGEX, '').trim()
+  // Strip attachment markers (with key: or File path: variants)
+  let cleaned = text.replace(ATTACHMENT_REGEX, '')
+  // Also strip any standalone "File path: ..." lines that may remain
+  cleaned = cleaned.replace(/\nFile path: .+/g, '')
+  return cleaned.trim()
+}
+
+function isImageType(contentType: string): boolean {
+  return contentType.startsWith('image/')
 }
 
 function AttachmentChip({
   originalName,
+  contentType,
   sizeKB,
+  fileKey,
+  onPreview,
 }: {
   originalName: string
   contentType: string
   sizeKB: number
+  fileKey?: string
+  onPreview?: (url: string, name: string) => void
 }) {
+  const isImage = isImageType(contentType)
+  const previewUrl = isImage && fileKey ? `/api/file?key=${encodeURIComponent(fileKey)}` : null
+
   return (
-    <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs">
-      <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+    <button
+      type="button"
+      onClick={() => {
+        if (previewUrl && onPreview) onPreview(previewUrl, originalName)
+      }}
+      disabled={!previewUrl}
+      className={`inline-flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-2 py-1 text-xs transition-colors ${
+        previewUrl ? 'cursor-pointer hover:bg-white/20' : 'cursor-default'
+      }`}
+    >
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt={originalName}
+          className="h-5 w-5 rounded object-cover"
+        />
+      ) : (
+        <FileText className="h-3.5 w-3.5 flex-shrink-0" />
+      )}
       <span className="max-w-[150px] truncate">{originalName}</span>
       <span className="opacity-60">{sizeKB}KB</span>
-    </div>
+    </button>
+  )
+}
+
+function ImagePreviewOverlay({
+  src,
+  alt,
+  onClose,
+}: {
+  src: string
+  alt: string
+  onClose: () => void
+}) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        onClick={onClose}
+        className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <motion.img
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+        src={src}
+        alt={alt}
+        className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      />
+    </motion.div>
   )
 }
 
@@ -60,6 +145,7 @@ export function MessageBubble({
   isStreaming?: boolean
 }) {
   const isUser = message.role === 'user'
+  const [preview, setPreview] = useState<{ src: string; alt: string } | null>(null)
   const displayParts = buildMessageDisplayParts(message.parts)
   const toolCalls = displayParts
     .filter(
@@ -118,6 +204,8 @@ export function MessageBubble({
                         originalName={att.originalName}
                         contentType={att.contentType}
                         sizeKB={att.sizeKB}
+                        fileKey={att.key}
+                        onPreview={(src, alt) => setPreview({ src, alt })}
                       />
                     ))}
                   </div>
@@ -186,18 +274,29 @@ export function MessageBubble({
   )
 
   return (
-    <motion.div
-      layout={isStreaming}
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -4 }}
-      transition={{
-        duration: 0.25,
-        ease: [0.16, 1, 0.3, 1],
-        layout: { duration: 0.12, ease: 'easeOut' },
-      }}
-    >
-      {bubbleContent}
-    </motion.div>
+    <>
+      <motion.div
+        layout={isStreaming}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -4 }}
+        transition={{
+          duration: 0.25,
+          ease: [0.16, 1, 0.3, 1],
+          layout: { duration: 0.12, ease: 'easeOut' },
+        }}
+      >
+        {bubbleContent}
+      </motion.div>
+      <AnimatePresence>
+        {preview && (
+          <ImagePreviewOverlay
+            src={preview.src}
+            alt={preview.alt}
+            onClose={() => setPreview(null)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   )
 }
