@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { UIMessage } from '@tanstack/ai'
 import { ChevronDown, FileText, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'motion/react'
+import { markdownToPreviewText } from '#/lib/message-preview'
 import { buildMessageDisplayParts } from '#/lib/tool-call-display'
 import type { ToolCallViewModel } from '#/lib/tool-call-display'
 import { ThinkingBlock } from './ThinkingBlock'
@@ -163,11 +164,13 @@ export function MessageBubble({
     .filter((p): p is { type: 'text'; content: string } => p.type === 'text')
     .map((p) => p.content)
     .join('')
-  const isLongAssistant = !isUser && fullText.length > LONG_MESSAGE_THRESHOLD
+  const collapsedPreviewText = markdownToPreviewText(fullText)
+  const isLongAssistant =
+    !isUser && collapsedPreviewText.length > LONG_MESSAGE_THRESHOLD
   const [isExpanded, setIsExpanded] = useState(!isLongAssistant)
 
   const renderContent = () => (
-    <>
+    <div className="flex flex-col gap-2">
       {displayParts.map((part, i) => {
         if (part.type === 'thinking') {
           return <ThinkingBlock key={i} content={part.content} />
@@ -225,11 +228,11 @@ export function MessageBubble({
         return null
       })}
       {showDots && (
-        <div className="mt-1 -mb-0.5 text-sand-500 dark:text-sand-400">
+        <div className="text-sand-500 dark:text-sand-400">
           <ThinkingDots />
         </div>
       )}
-    </>
+    </div>
   )
 
   const bubbleContent = isLongAssistant ? (
@@ -242,7 +245,7 @@ export function MessageBubble({
         ) : (
           <div className="px-4 py-2.5">
             <p className="leading-snug text-sand-600 dark:text-sand-300">
-              {fullText.slice(0, PREVIEW_LENGTH).trimEnd() + '…'}
+              {collapsedPreviewText.slice(0, PREVIEW_LENGTH).trimEnd() + '…'}
             </p>
           </div>
         )}

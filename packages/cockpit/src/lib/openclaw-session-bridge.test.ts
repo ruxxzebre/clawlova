@@ -5,7 +5,6 @@ import type { UIMessage } from '@tanstack/ai'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createOpenClawSessionStream,
-  deriveSessionKey,
   extractLatestUserMessageText,
   resolveAuthMode,
   translateGatewayEvent,
@@ -129,9 +128,9 @@ class MockWebSocket {
   }
 }
 
-async function collectStreamChunks(messages: UIMessage[]) {
+async function collectStreamChunks(message: string, sessionKey = 'agent:main:chat-user-1') {
   const chunks = []
-  for await (const chunk of createOpenClawSessionStream({ messages })) {
+  for await (const chunk of createOpenClawSessionStream({ message, sessionKey })) {
     chunks.push(chunk)
   }
   return chunks
@@ -180,16 +179,6 @@ describe('extractLatestUserMessageText', () => {
     ] as UIMessage[]
 
     expect(extractLatestUserMessageText(messages)).toBe('latest prompt')
-  })
-})
-
-describe('deriveSessionKey', () => {
-  it('stays stable for the same conversation seed', () => {
-    const messages = [
-      { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-    ] as UIMessage[]
-
-    expect(deriveSessionKey(messages)).toBe('agent:main:chat-user-1')
   })
 })
 
@@ -379,9 +368,7 @@ describe('createOpenClawSessionStream auth flow', () => {
         'openclaw-device-token',
       )
 
-      const chunks = await collectStreamChunks([
-        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as UIMessage[])
+      const chunks = await collectStreamChunks('hello')
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',
@@ -409,9 +396,7 @@ describe('createOpenClawSessionStream auth flow', () => {
       process.env['OPENCLAW_DEVICE_TOKEN_FILE'] = tokenFile
       await writeFile(tokenFile, 'cached-device-token\n', 'utf8')
 
-      await collectStreamChunks([
-        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as UIMessage[])
+      await collectStreamChunks('hello')
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',
@@ -443,9 +428,7 @@ describe('createOpenClawSessionStream auth flow', () => {
         },
       }
 
-      const chunks = await collectStreamChunks([
-        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as UIMessage[])
+      const chunks = await collectStreamChunks('hello')
 
       expect(chunks).toHaveLength(1)
       expect(chunks[0]).toMatchObject({
@@ -471,9 +454,7 @@ describe('createOpenClawSessionStream auth flow', () => {
         'openclaw-device-token',
       )
 
-      const chunks = await collectStreamChunks([
-        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as UIMessage[])
+      const chunks = await collectStreamChunks('hello')
 
       expect(chunks).toHaveLength(1)
       expect(chunks[0]).toMatchObject({
@@ -504,9 +485,7 @@ describe('createOpenClawSessionStream auth flow', () => {
       )
       await writeFile(tokenFile, 'file-bootstrap-token\n', 'utf8')
 
-      await collectStreamChunks([
-        { id: 'user-1', role: 'user', parts: [{ type: 'text', content: 'hello' }] },
-      ] as UIMessage[])
+      await collectStreamChunks('hello')
 
       const connectFrame = MockWebSocket.instances[0]?.sentFrames.find(
         (frame) => frame['method'] === 'connect',

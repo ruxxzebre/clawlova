@@ -1,9 +1,9 @@
-import type { StreamChunk, UIMessage } from '@tanstack/ai'
+import type { StreamChunk } from '@tanstack/ai'
 
 export interface SessionBridgeOptions {
-  messages: UIMessage[]
+  message: string
+  sessionKey: string
   abortSignal?: AbortSignal
-  sessionKey?: string
 }
 
 export interface DeviceIdentity {

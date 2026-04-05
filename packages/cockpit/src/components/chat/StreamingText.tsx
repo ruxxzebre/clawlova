@@ -168,7 +168,7 @@ export function StreamingText({
           ? { duration: 0.4, ease: [0.16, 1, 0.3, 1] }
           : { duration: 0 }
       }
-      className={`prose prose-sm prose-chat dark:prose-invert max-w-none leading-snug${showCursor ? ' is-streaming' : ''}`}
+      className={`prose prose-sm prose-chat dark:prose-invert max-w-none leading-relaxed${showCursor ? ' is-streaming' : ''}`}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}

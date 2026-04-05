@@ -1,14 +1,19 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useChat } from '@tanstack/ai-react'
-import { fetchServerSentEvents } from '@tanstack/ai-client'
+import { liteChatConnection } from '#/lib/lite-chat-connection'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { loadSession } from '#/server/functions'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { ArrowDown, Check, Code, Lightbulb, MessageCircle, Paperclip, RefreshCw, Send, Square, Wrench, X } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useChatUIStore } from '#/lib/chat-store'
 import { motion, AnimatePresence } from 'motion/react'
 import type { UIMessage } from '@tanstack/ai'
+import { ChatComposer } from '#/components/chat/ChatComposer'
+import { ChatDropOverlay } from '#/components/chat/ChatDropOverlay'
+import { ChatEmptyState } from '#/components/chat/ChatEmptyState'
 import { MessageBubble } from '#/components/chat/MessageBubble'
+import type { PendingAttachment } from '#/components/chat/PendingAttachmentList'
+import { ScrollToBottomControl } from '#/components/chat/ScrollToBottomControl'
 import { ThinkingDots } from '#/components/chat/ThinkingDots'
 
 export const Route = createFileRoute('/')({
@@ -20,13 +25,6 @@ export const Route = createFileRoute('/')({
     new: search.new ? Number(search.new) : undefined,
   }),
 })
-
-const STARTER_PROMPTS = [
-  { icon: Code, label: 'Write code', prompt: 'Help me write a ' },
-  { icon: Lightbulb, label: 'Explain something', prompt: 'Explain how ' },
-  { icon: Wrench, label: 'Debug an issue', prompt: 'Help me debug ' },
-  { icon: MessageCircle, label: 'Brainstorm ideas', prompt: 'Brainstorm ideas for ' },
-]
 
 // ---------------------------------------------------------------------------
 // Outer component: handles routing, data fetching, and keyed remounting
@@ -87,10 +85,17 @@ function ChatView({
   onChatFinish: () => void
 }) {
   const navigate = useNavigate()
+  const [effectiveSessionKey] = useState(() => {
+    if (sessionKey) return sessionKey
+    const id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('')
+    return `agent:main:chat-${id}`
+  })
   const { messages, sendMessage, isLoading, error, stop } = useChat({
-    connection: fetchServerSentEvents('/api/chat'),
+    connection: liteChatConnection('/api/chat'),
     initialMessages,
-    body: sessionKey ? { sessionKey } : undefined,
+    body: { sessionKey: effectiveSessionKey },
     onFinish: onChatFinish,
   })
 
@@ -100,33 +105,38 @@ function ChatView({
   const [input, setInput] = useState('')
   const [isAtBottom, setIsAtBottom] = useState(true)
   const [lastInput, setLastInput] = useState('')
-  const [pendingFiles, setPendingFiles] = useState<
-    { key: string; originalName: string; contentType: string; sizeBytes: number; previewUrl?: string }[]
-  >([])
+  const [pendingFiles, setPendingFiles] = useState<PendingAttachment[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const dragCounterRef = useRef(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const COMPOSER_INPUT_MIN_HEIGHT = 44
 
   const resizeTextarea = useCallback(() => {
     const el = inputRef.current
     if (!el) return
-    el.style.height = 'auto'
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px'
+    el.style.height = `${COMPOSER_INPUT_MIN_HEIGHT}px`
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, COMPOSER_INPUT_MIN_HEIGHT), 160)}px`
   }, [])
 
   async function uploadFiles(files: File[]) {
     if (files.length === 0) return
     setIsUploading(true)
-    try {
-      for (const file of files) {
+    setUploadError(null)
+    for (const file of files) {
+      try {
         const formData = new FormData()
         formData.append('file', file)
         const res = await fetch('/api/upload', { method: 'POST', body: formData })
-        if (!res.ok) throw new Error('Upload failed')
+        if (!res.ok) {
+          const body = await res.json().catch(() => null) as { error?: string } | null
+          setUploadError(body?.error ?? `Upload failed for ${file.name}`)
+          continue
+        }
         const { key, originalName, contentType, sizeBytes } = await res.json() as {
           key: string; originalName: string; contentType: string; sizeBytes: number
         }
@@ -137,12 +147,11 @@ function ChatView({
           ...prev,
           { key, originalName, contentType, sizeBytes, previewUrl },
         ])
+      } catch {
+        setUploadError(`Failed to upload ${file.name}`)
       }
-    } catch (err) {
-      console.error('Upload failed:', err)
-    } finally {
-      setIsUploading(false)
     }
+    setIsUploading(false)
   }
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -293,67 +302,14 @@ function ChatView({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* Drop overlay */}
-      <AnimatePresence>
-        {isDragging && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 z-50 flex items-center justify-center bg-terra-500/10 backdrop-blur-sm border-2 border-dashed border-terra-400 dark:border-terra-500 rounded-xl m-2"
-          >
-            <div className="flex flex-col items-center gap-2 text-terra-600 dark:text-terra-400">
-              <Paperclip className="h-8 w-8" />
-              <p className="text-sm font-medium">Drop files to attach</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <ChatDropOverlay isDragging={isDragging} />
 
-      {/* Message list */}
       <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6" ref={scrollContainerRef}>
         <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
-          <AnimatePresence mode="wait">
-            {messages.length === 0 && (
-              <motion.div
-                key="empty"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="flex h-full flex-col items-center justify-center py-16 text-center"
-              >
-                <p className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-sand-800 dark:text-sand-100">
-                  What can I help with?
-                </p>
-                <p className="mt-1.5 sm:mt-2 text-sm sm:text-base text-sand-500 dark:text-sand-400">
-                  Ask anything — powered by OpenClaw
-                </p>
-                <div className="mt-6 sm:mt-8 grid grid-cols-2 gap-2 sm:gap-2.5 w-full max-w-md">
-                  {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }, i) => (
-                    <motion.button
-                      key={label}
-                      type="button"
-                      onClick={() => handleStarterClick(prompt)}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 + i * 0.05, duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      className="group flex items-center gap-2 sm:gap-2.5 rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-50 dark:bg-sand-900 px-3 py-2.5 sm:px-4 sm:py-3 text-left text-xs sm:text-sm text-sand-600 dark:text-sand-300 transition-colors hover:border-terra-300 hover:text-terra-600 dark:hover:border-terra-600 dark:hover:text-terra-400"
-                    >
-                      <Icon className="h-4 w-4 flex-shrink-0 text-sand-400 group-hover:text-terra-500 dark:text-sand-500 dark:group-hover:text-terra-400 transition-colors" />
-                      {label}
-                    </motion.button>
-                  ))}
-                </div>
-                <p className="mt-6 hidden sm:block text-xs text-sand-400 dark:text-sand-500">
-                  Press <kbd className="rounded border border-sand-300 dark:border-sand-600 bg-sand-100 dark:bg-sand-800 px-1.5 py-0.5 font-mono text-[11px]">/</kbd> to focus input &middot; <kbd className="rounded border border-sand-300 dark:border-sand-600 bg-sand-100 dark:bg-sand-800 px-1.5 py-0.5 font-mono text-[11px]">Esc</kbd> to stop
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <ChatEmptyState
+            visible={messages.length === 0}
+            onStarterClick={handleStarterClick}
+          />
 
           <AnimatePresence initial={false}>
             {messages.map((message, index) => (
@@ -374,7 +330,7 @@ function ChatView({
                 exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
                 className="flex justify-start"
               >
-                <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sand-500 dark:text-sand-400">
+                <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sm text-sand-500 dark:text-sand-400">
                   <ThinkingDots />
                 </div>
               </motion.div>
@@ -410,140 +366,32 @@ function ChatView({
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Scroll to bottom / auto-scroll split button */}
-        <AnimatePresence>
-          {!isAtBottom && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.2 }}
-              className="sticky bottom-4 mx-auto flex w-fit items-center gap-[3px]"
-            >
-              {/* Left side – scroll to bottom (80%) */}
-              <button
-                type="button"
-                onClick={scrollToBottom}
-                className="flex items-center gap-1.5 rounded-l-full rounded-r-sm border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 pl-3 pr-3 py-1.5 text-xs font-medium text-sand-600 dark:text-sand-300 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
-              >
-                <ArrowDown className="h-3.5 w-3.5" />
-                Scroll to bottom
-              </button>
-
-              {/* Right side – auto-scroll toggle (20%) */}
-              <button
-                type="button"
-                onClick={toggleAutoScroll}
-                title={autoScroll ? 'Auto-scroll on – click to disable' : 'Auto-scroll off – click to enable'}
-                className="flex items-center justify-center rounded-l-sm rounded-r-[10px] border border-sand-200 dark:border-sand-700 bg-sand-50/90 dark:bg-sand-900/90 px-2 py-1.5 shadow-lg transition-colors hover:bg-sand-100 dark:hover:bg-sand-800"
-              >
-                <div className={`flex h-3.5 w-3.5 items-center justify-center rounded-[3px] border transition-colors ${autoScroll ? 'border-terra-500 bg-terra-500' : 'border-sand-400 dark:border-sand-500'}`}>
-                  {autoScroll && <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />}
-                </div>
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ScrollToBottomControl
+          visible={!isAtBottom}
+          autoScroll={autoScroll}
+          onScrollToBottom={scrollToBottom}
+          onToggleAutoScroll={toggleAutoScroll}
+        />
       </div>
-
-      {/* Input area */}
-      <div className="border-t border-sand-200 dark:border-sand-800 bg-sand-50 dark:bg-sand-950 px-3 py-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] sm:px-4 sm:py-3">
-        <div className="mx-auto max-w-3xl">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-            {/* Pending file previews */}
-            {pendingFiles.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {pendingFiles.map((file) => (
-                  <div
-                    key={file.key}
-                    className="flex items-center gap-2 rounded-lg border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-2.5 py-1.5 text-xs text-sand-600 dark:text-sand-300"
-                  >
-                    {file.previewUrl ? (
-                      <img
-                        src={file.previewUrl}
-                        alt={file.originalName}
-                        className="h-8 w-8 rounded object-cover"
-                      />
-                    ) : null}
-                    <span className="max-w-[120px] truncate">
-                      {file.originalName}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removePendingFile(file.key)}
-                      className="text-sand-400 hover:text-sand-600 dark:hover:text-sand-200"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex gap-2 sm:gap-3">
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml,application/pdf,text/plain,text/csv,text/markdown,application/json,application/xml"
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isLoading || isUploading}
-                title="Attach file"
-                className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 text-sand-500 dark:text-sand-400 transition-colors hover:bg-sand-200 dark:hover:bg-sand-700 hover:text-sand-700 dark:hover:text-sand-200 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <Paperclip className="h-4 w-4" />
-              </button>
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => {
-                  setInput(e.target.value)
-                  resizeTextarea()
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder={
-                  isUploading
-                    ? 'Uploading file...'
-                    : isLoading
-                      ? 'OpenClaw is responding...'
-                      : 'Message OpenClaw\u2026'
-                }
-                disabled={isLoading || isUploading}
-                aria-disabled={isLoading || isUploading}
-                rows={1}
-                className="flex-1 resize-none rounded-xl border border-sand-200 dark:border-sand-700 bg-sand-100 dark:bg-sand-800 px-3 py-2.5 sm:px-4 text-sm sm:text-base text-sand-800 dark:text-sand-100 placeholder:text-sand-400 outline-none focus:border-terra-400 dark:focus:border-terra-500 focus:ring-1 focus:ring-terra-400/30 disabled:cursor-not-allowed disabled:bg-sand-200 disabled:text-sand-500 dark:disabled:bg-sand-800/80 dark:disabled:text-sand-400 disabled:opacity-60"
-              />
-              {isLoading ? (
-                <motion.button
-                  type="button"
-                  onClick={stop}
-                  title="Stop generating (Esc)"
-                  whileTap={{ scale: 0.92 }}
-                  className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-red-600 text-white transition-colors hover:bg-red-700"
-                >
-                  <Square className="h-3.5 w-3.5 fill-current" />
-                </motion.button>
-              ) : (
-                <motion.button
-                  type="submit"
-                  disabled={!input.trim() && pendingFiles.length === 0}
-                  aria-disabled={!input.trim() && pendingFiles.length === 0}
-                  title="Send message (Enter)"
-                  whileTap={{ scale: 0.92 }}
-                  className="flex h-11 w-11 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center self-end rounded-xl bg-terra-500 text-white transition-colors hover:bg-terra-600 disabled:cursor-not-allowed disabled:bg-sand-300 disabled:text-sand-500 dark:disabled:bg-sand-700 dark:disabled:text-sand-400"
-                >
-                  <Send className="h-4 w-4" />
-                </motion.button>
-              )}
-            </div>
-          </form>
-        </div>
-      </div>
+      <ChatComposer
+        input={input}
+        pendingFiles={pendingFiles}
+        isLoading={isLoading}
+        isUploading={isUploading}
+        uploadError={uploadError}
+        textareaRef={inputRef}
+        fileInputRef={fileInputRef}
+        onSubmit={handleSubmit}
+        onFileSelect={handleFileSelect}
+        onInputChange={(value) => {
+          setInput(value)
+          resizeTextarea()
+        }}
+        onInputKeyDown={handleKeyDown}
+        onRemovePendingFile={removePendingFile}
+        onDismissUploadError={() => setUploadError(null)}
+        onStop={stop}
+      />
     </div>
   )
 }

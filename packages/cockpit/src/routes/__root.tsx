@@ -67,9 +67,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
         <HeadContent />
       </head>
-      <body className="font-body antialiased wrap-anywhere bg-sand-50 text-sand-800 dark:bg-sand-950 dark:text-sand-100 selection:bg-terra-200/40 dark:selection:bg-terra-500/30">
+      <body className="overflow-hidden font-body antialiased wrap-anywhere bg-sand-50 text-sand-800 dark:bg-sand-950 dark:text-sand-100 selection:bg-terra-200/40 dark:selection:bg-terra-500/30">
         <TanStackQueryProvider>
-          <div className="flex h-screen overflow-hidden">
+          <div className="flex h-dvh overflow-hidden">
             {/* Mobile sidebar overlay */}
             {sidebarOpen && (
               <div

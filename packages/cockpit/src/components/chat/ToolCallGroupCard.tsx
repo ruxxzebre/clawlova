@@ -23,7 +23,7 @@ export function ToolCallGroupCard({
   )
 
   return (
-    <div className="-mx-1.5 my-4 overflow-hidden rounded-xl border border-sand-300/70 bg-sand-50/70 dark:border-sand-700 dark:bg-sand-800/60">
+    <div className="-mx-1.5 overflow-hidden rounded-xl border border-sand-300/70 bg-sand-50/70 dark:border-sand-700 dark:bg-sand-800/60">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}

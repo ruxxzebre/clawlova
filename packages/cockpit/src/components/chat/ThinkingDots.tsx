@@ -1,6 +1,6 @@
 export function ThinkingDots() {
   return (
-    <div className="flex gap-1.5">
+    <div className="flex items-center gap-1.5 min-h-[1.625em]">
       {[0, 1, 2].map((i) => (
         <span
           key={i}

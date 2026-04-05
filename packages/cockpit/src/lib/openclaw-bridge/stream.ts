@@ -5,7 +5,6 @@ import { AsyncQueue } from './async-queue'
 import { loadBridgeAuthState } from './auth'
 import { getBridgeConfig } from './config'
 import { streamViaGatewayWebSocket } from './gateway'
-import { deriveSessionKey, extractLatestUserMessageText } from './translate'
 import { genId, toRunError } from './utils'
 
 export function createOpenClawSessionStream(
@@ -33,10 +32,7 @@ async function runSessionBridge(
   const runId = genId('run')
 
   try {
-    let prompt = extractLatestUserMessageText(options.messages)
-    if (!prompt) {
-      throw new Error('No user message found to send to OpenClaw')
-    }
+    let prompt = options.message
 
     // Parse attachment markers embedded in the message text by the client
     // Format: [Attached file: name (type, NKB) key:uploads/uuid_name]
@@ -59,7 +55,7 @@ async function runSessionBridge(
 
     const config = getBridgeConfig()
     const auth = await loadBridgeAuthState(config)
-    const sessionKey = options.sessionKey ?? deriveSessionKey(options.messages)
+    const sessionKey = options.sessionKey
     const state: GatewayState = {
       runId,
       messageId: genId('msg'),

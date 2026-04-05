@@ -45,14 +45,14 @@ body {
 
 /* Compact prose spacing for chat bubbles */
 .prose-chat {
-  & p { margin-top: 0.25em; margin-bottom: 0.25em; }
+  & p { margin-top: 0.5em; margin-bottom: 0.5em; }
   & h1 { margin-top: 0.5em; margin-bottom: 0.25em; }
   & h2 { margin-top: 0.5em; margin-bottom: 0.2em; }
   & h3 { margin-top: 0.4em; margin-bottom: 0.15em; }
   & h4, & h5, & h6 { margin-top: 0.35em; margin-bottom: 0.15em; }
   & pre { margin-top: 0.4em; margin-bottom: 0.4em; }
   & ul, & ol { margin-top: 0.25em; margin-bottom: 0.25em; }
-  & li { margin-top: 0; margin-bottom: 0; }
+  & li { margin-top: 0.15em; margin-bottom: 0.15em; }
   & blockquote { margin-top: 0.35em; margin-bottom: 0.35em; }
   & hr { margin-top: 0.5em; margin-bottom: 0.5em; }
   & table { margin-top: 0.35em; margin-bottom: 0.35em; }

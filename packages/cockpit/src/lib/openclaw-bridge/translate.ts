@@ -196,11 +196,6 @@ export function extractLatestUserMessageText(
   return null
 }
 
-export function deriveSessionKey(messages: UIMessage[]): string {
-  const seed = messages.find((message) => message.role === 'user')?.id ?? crypto.randomUUID()
-  return `agent:main:chat-${seed}`
-}
-
 /** Extract text from a gateway message object with `content: [{type:"text", text:"..."}]` */
 function extractMessageText(message: Record<string, unknown>): string | null {
   const content = message['content']
