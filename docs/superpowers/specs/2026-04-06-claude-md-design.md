@@ -57,7 +57,7 @@ Create a layered CLAUDE.md setup for the Clawlova project: a root-level file for
 - `src/lib/openclaw-bridge/` — WebSocket bridge to OpenClaw gateway (auth, streaming, message translation). Understand before modifying — this is the critical data path.
 - `src/routes/` — TanStack Router file-based routes + API routes (`api.chat.ts`, `api.file.ts`, `api.upload.ts`)
 - `src/server/functions.ts` — all server functions use `createServerFn` from TanStack Start
-- `src/data/` — TanStack Query integration
+- `src/integrations/tanstack-query/` — TanStack Query provider and devtools setup
 
 **Architecture patterns:**
 - Server functions go through `createServerFn` in `src/server/functions.ts`
