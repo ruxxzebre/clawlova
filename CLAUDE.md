@@ -19,13 +19,13 @@ docker compose up --build             # start the full stack
 
 Services:
 
-| Service | Role |
-|---------|------|
-| `openclaw-init` | One-shot: generates config + bootstrap gateway token |
-| `openclaw-gateway` | AI agent runtime (WebSocket on :18789) |
+| Service               | Role                                                   |
+| --------------------- | ------------------------------------------------------ |
+| `openclaw-init`     | One-shot: generates config + bootstrap gateway token   |
+| `openclaw-gateway`  | AI agent runtime (WebSocket on :18789)                 |
 | `cockpit-bootstrap` | One-shot: generates device keypair, pairs with gateway |
-| `cockpit` | Chat web app (port 3000) |
-| `openclaw-cli` | Optional: interactive CLI for manual OpenClaw commands |
+| `cockpit`           | Chat web app (port 3000)                               |
+| `openclaw-cli`      | Optional: interactive CLI for manual OpenClaw commands |
 
 First startup takes ~60s while OpenClaw initializes and the device is paired.
 
@@ -33,13 +33,13 @@ First startup takes ~60s while OpenClaw initializes and the device is paired.
 
 At least one LLM provider API key is required.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPENAI_API_KEY` | — | OpenAI API key |
-| `ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `GOOGLE_API_KEY` | — | Google API key |
-| `COCKPIT_PORT` | `3000` | Cockpit web UI port |
-| `OPENCLAW_GATEWAY_PORT` | `18789` | Gateway port |
+| Variable                  | Default   | Description         |
+| ------------------------- | --------- | ------------------- |
+| `OPENAI_API_KEY`        | —        | OpenAI API key      |
+| `ANTHROPIC_API_KEY`     | —        | Anthropic API key   |
+| `GOOGLE_API_KEY`        | —        | Google API key      |
+| `COCKPIT_PORT`          | `3000`  | Cockpit web UI port |
+| `OPENCLAW_GATEWAY_PORT` | `18789` | Gateway port        |
 
 ## Gotchas
 

@@ -235,43 +235,39 @@ export function MessageBubble({
     </div>
   )
 
-  const bubbleContent = isLongAssistant ? (
-    <div className="flex justify-start">
-      <div className="max-w-[92%] sm:max-w-[80%] rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 text-sm text-sand-800 dark:text-sand-100">
-        {isExpanded ? (
-          <div className="px-4 py-3">
-            {renderContent()}
-          </div>
-        ) : (
+  const bubbleContent = (
+    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <motion.div
+        layout={isStreaming ? 'position' : false}
+        transition={isStreaming ? { layout: { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] } } : undefined}
+        className={`max-w-[92%] sm:max-w-[80%] rounded-2xl text-sm ${isUser
+            ? 'rounded-tr-sm bg-terra-500 text-white'
+            : 'rounded-tl-sm bg-sand-100 dark:bg-sand-800 text-sand-800 dark:text-sand-100'
+          }`}
+      >
+        {isLongAssistant && !isExpanded ? (
           <div className="px-4 py-2.5">
             <p className="leading-snug text-sand-600 dark:text-sand-300">
               {collapsedPreviewText.slice(0, PREVIEW_LENGTH).trimEnd() + '…'}
             </p>
           </div>
+        ) : (
+          <div className="px-4 py-3">
+            {renderContent()}
+          </div>
         )}
-        <button
-          type="button"
-          onClick={() => setIsExpanded((v) => !v)}
-          className="flex w-full items-center justify-center gap-1.5 border-t border-sand-200/60 dark:border-sand-700/60 px-3 py-1.5 text-xs font-medium text-sand-500 dark:text-sand-400 hover:text-sand-700 dark:hover:text-sand-200 transition-colors"
-        >
-          {isExpanded ? 'Show less' : 'Show more'}
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-          />
-        </button>
-      </div>
-    </div>
-  ) : (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <motion.div
-        layout={isStreaming ? 'position' : false}
-        transition={isStreaming ? { layout: { duration: 0.15, ease: [0.25, 0.1, 0.25, 1] } } : undefined}
-        className={`max-w-[92%] sm:max-w-[80%] rounded-2xl px-4 py-3 text-sm ${isUser
-            ? 'rounded-tr-sm bg-terra-500 text-white'
-            : 'rounded-tl-sm bg-sand-100 dark:bg-sand-800 text-sand-800 dark:text-sand-100'
-          }`}
-      >
-        {renderContent()}
+        {isLongAssistant && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((v) => !v)}
+            className="flex w-full items-center justify-center gap-1.5 border-t border-sand-200/60 dark:border-sand-700/60 px-3 py-1.5 text-xs font-medium text-sand-500 dark:text-sand-400 hover:text-sand-700 dark:hover:text-sand-200 transition-colors"
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+            />
+          </button>
+        )}
       </motion.div>
     </div>
   )
@@ -279,7 +275,7 @@ export function MessageBubble({
   return (
     <>
       <motion.div
-        layout={isStreaming}
+        layout={isStreaming ? 'position' : false}
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -4 }}

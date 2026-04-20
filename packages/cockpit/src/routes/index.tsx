@@ -304,70 +304,72 @@ function ChatView({
     >
       <ChatDropOverlay isDragging={isDragging} />
 
-      <div className="relative flex-1 overflow-y-auto px-3 py-4 sm:px-4 sm:py-6" ref={scrollContainerRef}>
-        <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
-          <ChatEmptyState
-            visible={messages.length === 0}
-            onStarterClick={handleStarterClick}
-          />
+      <div className="relative flex-1 overflow-hidden">
+        <div className="relative h-full overflow-y-auto px-3 py-4 sm:px-4 sm:py-6" ref={scrollContainerRef}>
+          <div className="mx-auto max-w-3xl space-y-3 sm:space-y-4">
+            <ChatEmptyState
+              visible={messages.length === 0}
+              onStarterClick={handleStarterClick}
+            />
 
-          <AnimatePresence initial={false}>
-            {messages.map((message, index) => (
-              <MessageBubble
-                key={message.id}
-                message={message}
-                isStreaming={isLoading && index === messages.length - 1}
-              />
-            ))}
-          </AnimatePresence>
+            <AnimatePresence initial={false}>
+              {messages.map((message, index) => (
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  isStreaming={isLoading && index === messages.length - 1}
+                />
+              ))}
+            </AnimatePresence>
 
-          <AnimatePresence>
-            {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-              <motion.div
-                key="thinking-indicator"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
-                className="flex justify-start"
-              >
-                <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sm text-sand-500 dark:text-sand-400">
-                  <ThinkingDots />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+                <motion.div
+                  key="thinking-indicator"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4, transition: { duration: 0.15 } }}
+                  className="flex justify-start"
+                >
+                  <div className="rounded-2xl rounded-tl-sm bg-sand-100 dark:bg-sand-800 px-4 py-3 text-sm text-sand-500 dark:text-sand-400">
+                    <ThinkingDots />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{ duration: 0.2 }}
-                className="rounded-xl border border-red-300/40 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 px-4 py-3 text-sm"
-              >
-                <p className="text-red-700 dark:text-red-300">
-                  Something went wrong — {error.message}
-                </p>
-                {lastInput && (
-                  <button
-                    type="button"
-                    onClick={handleRetry}
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-100 dark:hover:bg-red-500/20"
-                  >
-                    <RefreshCw className="h-3 w-3" />
-                    Try again
-                  </button>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+            <AnimatePresence>
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.96 }}
+                  transition={{ duration: 0.2 }}
+                  className="rounded-xl border border-red-300/40 bg-red-50 dark:border-red-500/30 dark:bg-red-500/10 px-4 py-3 text-sm"
+                >
+                  <p className="text-red-700 dark:text-red-300">
+                    Something went wrong — {error.message}
+                  </p>
+                  {lastInput && (
+                    <button
+                      type="button"
+                      onClick={handleRetry}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-red-200 dark:border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 transition-colors hover:bg-red-100 dark:hover:bg-red-500/20"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                      Try again
+                    </button>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          <div ref={messagesEndRef} />
+            <div ref={messagesEndRef} />
+          </div>
         </div>
 
         <ScrollToBottomControl
-          visible={!isAtBottom}
+          visible={!isAtBottom || (isLoading && autoScroll)}
           autoScroll={autoScroll}
           onScrollToBottom={scrollToBottom}
           onToggleAutoScroll={toggleAutoScroll}

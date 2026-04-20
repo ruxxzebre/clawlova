@@ -50,7 +50,35 @@ body {
   & h2 { margin-top: 0.5em; margin-bottom: 0.2em; }
   & h3 { margin-top: 0.4em; margin-bottom: 0.15em; }
   & h4, & h5, & h6 { margin-top: 0.35em; margin-bottom: 0.15em; }
-  & pre { margin-top: 0.4em; margin-bottom: 0.4em; }
+  & pre {
+    margin-top: 0.4em;
+    margin-bottom: 0.4em;
+    padding: 0.75em 1em;
+    border-radius: 0.5rem;
+    border: none;
+    overflow-x: auto;
+    background-color: #0d1117;
+    font-size: 0.82em;
+    line-height: 1.6;
+  }
+  & pre code {
+    white-space: pre;
+    word-break: normal;
+    overflow-wrap: normal;
+    background: transparent;
+    padding: 0;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  & :not(pre) > code {
+    padding: 0.15em 0.35em;
+    border-radius: 0.25rem;
+    background-color: rgba(0, 0, 0, 0.08);
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  }
+  :is(.dark) & :not(pre) > code {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
   & ul, & ol { margin-top: 0.25em; margin-bottom: 0.25em; }
   & li { margin-top: 0.15em; margin-bottom: 0.15em; }
   & blockquote { margin-top: 0.35em; margin-bottom: 0.35em; }

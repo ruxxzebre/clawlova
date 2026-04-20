@@ -20,7 +20,7 @@ export function ScrollToBottomControl({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}
           transition={{ duration: 0.2 }}
-          className="sticky bottom-4 mx-auto flex w-fit items-center gap-[3px]"
+          className="absolute inset-x-0 bottom-4 z-10 mx-auto flex w-fit items-center gap-[3px]"
         >
           <button
             type="button"
